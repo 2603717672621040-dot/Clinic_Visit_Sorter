@@ -1,0 +1,40 @@
+.streamlit/secrets.toml
+secrets.toml
+.streamlit_backup
+*.db
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+clinic.db
+.env
+
+__pycache__/
+*.pyc
+clinic.db
+.env
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# API keys and secrets
+secrets.toml
+.streamlit/secrets.toml
+.env
+
+# Backups
+*_backup.py
+*.bak
+
+# Temporary files
+.DS_Store
