@@ -1,40 +1,39 @@
-.streamlit/secrets.toml
+﻿# API keys and secrets
+.env
+.env.*
+!.env.example
 secrets.toml
-.streamlit_backup
-*.db
-__pycache__/
-.pytest_cache/
-.venv/
-venv/
-.streamlit/secrets.toml
-__pycache__/
-*.pyc
-clinic.db
-.env
-
-__pycache__/
-*.pyc
-clinic.db
-.env
-.streamlit/secrets.toml
-
-# Python
-__pycache__/
-*.pyc
+**/secrets.toml
 
 # Local databases
 *.db
 *.sqlite
 *.sqlite3
 
-# API keys and secrets
-secrets.toml
-.streamlit/secrets.toml
-.env
+# Python temporary files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
 
-# Backups
-*_backup.py
-*.bak
+# API usage logs
+api_usage*.jsonl
 
-# Temporary files
+# Local backups
+*_backup*
+app_before_*.py
+README_before_*.md
+
+# Generated submission packages
+*.zip
+CLINIQ_Submission/
+CLINIQ_Submission_backup*/
+
+# Operating system files
 .DS_Store
+Thumbs.db
+
+# Old experimental Python backups
+*_before_*.py
+*_backup*.py

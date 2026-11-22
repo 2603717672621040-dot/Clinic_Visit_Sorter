@@ -1,9 +1,11 @@
-
+﻿
 import streamlit as st
 import pandas as pd
-import backend
+import backend_v2 as backend
 import io
 import html
+import json
+import re
 from datetime import datetime, date
 
 
@@ -13,7 +15,7 @@ from datetime import datetime, date
 
 st.set_page_config(
     page_title="CLINIQ | Smart Clinic",
-    page_icon="✚",
+    page_icon="\u2728",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -43,8 +45,9 @@ if "staff_id" not in st.session_state:
 
 
 
+
 # =========================================================
-# LOGIN - NO PASSWORD
+# LOGIN - SECURE STAFF AUTHENTICATION
 # =========================================================
 
 if not st.session_state.authenticated:
@@ -54,7 +57,7 @@ if not st.session_state.authenticated:
     left, right = st.columns([1.1, 1], gap="large")
 
     with left:
-        st.markdown("# ✚ CLINIQ")
+        st.markdown("# CLINIQ")
         st.caption("SMART CLINIC MANAGEMENT SYSTEM")
 
         st.markdown("### A smarter way to manage clinic visits")
@@ -71,34 +74,99 @@ if not st.session_state.authenticated:
         st.write("- Clinic activity reports")
         st.write("- Staff management")
 
+    
+    
     with right:
-        st.subheader("Staff Login")
-        st.caption("Enter your details to continue.")
+        st.subheader("Welcome to CLINIQ")
 
-        with st.form("login_form"):
-            username = st.text_input("Username")
 
-            selected_role = st.selectbox(
-                "Select Role",
-                ["Admin", "Nurse", "Staff"]
-            )
 
-            submitted = st.form_submit_button(
-                "Enter CLINIQ",
-                width="stretch"
-            )
+        login_tab, register_tab = st.tabs([
+            "Staff Login",
+            "Create New Account"
+        ])
 
-        if submitted:
-            if not username.strip():
-                st.error("Please enter your username.")
-            else:
-                st.session_state.authenticated = True
-                st.session_state.username = username.strip()
-                st.session_state.role = selected_role
-                st.session_state.staff_id = None
-                st.rerun()
+        with login_tab:
+            st.caption("Enter your registered username and password.")
+
+            with st.form("login_form"):
+                username = st.text_input("Username")
+                password = st.text_input(
+                    "Password",
+                    type="password"
+                )
+                submitted = st.form_submit_button(
+                    "Enter CLINIQ",
+                    width="stretch"
+                )
+
+            if submitted:
+                if not username.strip() or not password:
+                    st.error("Please enter both username and password.")
+                else:
+                    try:
+                        staff = backend.authenticate_staff(
+                            username.strip(), password
+                        )
+                        if staff:
+                            st.session_state.authenticated = True
+                            st.session_state.username = staff["username"]
+                            st.session_state.role = staff["role"]
+                            st.session_state.staff_id = staff["id"]
+                            st.success("Login successful.")
+                            st.rerun()
+                        else:
+                            st.error("Invalid username or password.")
+                    except Exception as error:
+                        st.error(f"Login failed: {error}")
+
+        with register_tab:
+            st.caption("Create your own CLINIQ staff account.")
+
+            with st.form("create_account_form"):
+                full_name = st.text_input("Full Name")
+                new_username = st.text_input("Create Username")
+                new_password = st.text_input(
+                    "Create Password", type="password"
+                )
+                confirm_password = st.text_input(
+                    "Confirm Password", type="password"
+                )
+                register_submitted = st.form_submit_button(
+                    "Create Account",
+                    width="stretch"
+                )
+
+            if register_submitted:
+                if not full_name.strip():
+                    st.error("Please enter your full name.")
+                elif not new_username.strip():
+                    st.error("Please create a username.")
+                elif not re.fullmatch(
+                    r"[A-Za-z0-9._@-]{3,50}", new_username.strip()
+                ):
+                    st.error("Invalid username format.")
+                elif len(new_password) < 8:
+                    st.error("Password must contain at least 8 characters.")
+                elif new_password != confirm_password:
+                    st.error("Passwords do not match.")
+                else:
+                    try:
+                        backend.add_staff(
+                            full_name.strip(),
+                            new_username.strip(),
+                            new_password,
+                            "Staff"
+                        )
+                        st.success(
+                            "Account created! You can now log in."
+                        )
+                    except Exception as error:
+                        st.error(f"Unable to create account: {error}")
 
     st.stop()
+
+
 
 
 
@@ -107,115 +175,427 @@ if not st.session_state.authenticated:
 # CUSTOM DESIGN
 # =========================================================
 
+
 st.markdown("""
 <style>
 
-/* Main application */
-.stApp {
-    background-color: #f3f7fb;
+/* =========================================
+   CLINIQ MODERN DESIGN SYSTEM
+========================================= */
+
+:root {
+    --navy: #10243A;
+    --navy-light: #193B56;
+    --teal: #0D9488;
+    --teal-light: #14B8A6;
+    --page-bg: #F4F7FB;
+    --card-bg: #FFFFFF;
+    --text-main: #172B42;
+    --text-muted: #718096;
+    --border: #E2EAF1;
 }
 
-/* Sidebar */
+/* MAIN APPLICATION */
+
+.stApp {
+    background: var(--page-bg);
+    color: var(--text-main);
+}
+
+.block-container {
+    max-width: 1500px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+}
+
+/* SIDEBAR */
+
 [data-testid="stSidebar"] {
-    background-color: #10243a;
+    background: linear-gradient(
+        180deg,
+        #10243A 0%,
+        #173B55 100%
+    );
+    border-right: 1px solid #24465F;
 }
 
 [data-testid="stSidebar"] * {
-    color: white;
+    color: #F1F7FB;
 }
 
-/* Main headings */
+[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    padding: 9px 12px;
+    border-radius: 9px;
+    transition: background 0.2s ease;
+}
+
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+    background: rgba(255,255,255,0.12);
+}
+
+/* HEADINGS */
+
+h1, h2, h3 {
+    color: var(--navy);
+    font-weight: 750;
+    letter-spacing: -0.4px;
+}
+
 .main-title {
     font-size: 34px;
     font-weight: 800;
-    color: #10243a;
+    color: var(--navy);
 }
 
 .section-caption {
-    color: #718096;
+    color: var(--text-muted);
     font-size: 14px;
 }
 
-/* Dashboard welcome banner */
+/* DASHBOARD HERO */
+
 .dashboard-hero {
-    background: linear-gradient(120deg, #10243a, #176b78);
-    padding: 30px;
-    border-radius: 18px;
+    background: linear-gradient(
+        120deg,
+        #10243A,
+        #087F8C
+    );
+    padding: 34px;
+    border-radius: 20px;
     color: white;
-    margin-bottom: 25px;
+    margin-bottom: 26px;
+    box-shadow: 0 10px 30px rgba(16,36,58,0.14);
 }
 
 .dashboard-hero h2 {
-    color: white;
+    color: white !important;
     font-size: 30px;
-    margin-bottom: 8px;
+    font-weight: 800;
 }
 
 .dashboard-hero p {
-    color: #e0f2f1;
+    color: #E0F7FA !important;
     font-size: 15px;
 }
 
-/* Dashboard section headings */
-.dashboard-section {
-    color: #10243a;
-    font-size: 21px;
-    font-weight: 750;
-    margin-top: 20px;
-    margin-bottom: 12px;
+/* METRIC CARDS */
+
+div[data-testid="stMetric"] {
+    background: var(--card-bg);
+    padding: 20px;
+    border: 1px solid var(--border);
+    border-radius: 17px;
+    box-shadow: 0 5px 18px rgba(16,36,58,0.055);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Metric cards */
-.metric-card {
-    background: white;
-    padding: 22px;
-    min-height: 110px;
-    border-radius: 15px;
-    border: 1px solid #e5edf4;
-    box-shadow: 0 4px 14px rgba(20, 45, 70, 0.06);
+div[data-testid="stMetric"]:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 9px 22px rgba(16,36,58,0.09);
 }
 
-.metric-label {
-    color: #718096;
-    font-size: 14px;
+div[data-testid="stMetricLabel"] {
+    color: var(--text-muted);
+    font-weight: 650;
 }
 
-.metric-value {
-    color: #10243a;
+div[data-testid="stMetricValue"] {
+    color: var(--navy);
     font-size: 30px;
     font-weight: 800;
 }
 
-/* Priority cards */
+/* CUSTOM CARDS */
+
+.metric-card,
 .priority-card {
     background: white;
-    padding: 18px;
-    border-radius: 14px;
-    border: 1px solid #e5edf4;
-    text-align: center;
+    padding: 22px;
+    border-radius: 17px;
+    border: 1px solid var(--border);
+    box-shadow: 0 5px 18px rgba(16,36,58,0.05);
 }
 
+.metric-label {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.metric-value,
 .priority-number {
-    font-size: 28px;
+    color: var(--navy);
+    font-size: 29px;
     font-weight: 800;
-    color: #10243a;
 }
 
-/* Buttons */
-div.stButton > button,
-div.stFormSubmitButton > button {
-    border-radius: 9px;
-    font-weight: 600;
+/* BUTTONS */
+
+div[data-testid="stButton"] > button,
+div[data-testid="stFormSubmitButton"] > button {
+    border-radius: 11px;
+    min-height: 44px;
+    font-weight: 700;
+    border: 1px solid #D6E4EA;
+    transition: all 0.2s ease;
 }
 
-/* Page spacing */
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
+div[data-testid="stButton"] > button:hover,
+div[data-testid="stFormSubmitButton"] > button:hover {
+    border-color: var(--teal);
+    color: var(--teal);
+}
+
+/* INPUT FIELDS */
+
+div[data-testid="stTextInput"] input,
+div[data-testid="stTextArea"] textarea,
+div[data-testid="stNumberInput"] input {
+    border-radius: 10px;
+    border-color: #D8E3EC;
+}
+
+div[data-testid="stTextInput"] input:focus,
+div[data-testid="stTextArea"] textarea:focus {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 2px rgba(13,148,136,0.12);
+}
+
+/* FORMS */
+
+[data-testid="stForm"] {
+    background: white;
+    padding: 22px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+}
+
+/* TABS */
+
+button[data-baseweb="tab"] {
+    font-weight: 650;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: var(--teal);
+}
+
+/* DATA TABLES */
+
+div[data-testid="stDataFrame"] {
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    overflow: hidden;
+}
+
+/* ALERTS */
+
+div[data-testid="stAlert"] {
+    border-radius: 12px;
+}
+
+/* DIVIDERS */
+
+hr {
+    border-color: var(--border);
+}
+
+/* RESPONSIVE SPACING */
+
+@media (max-width: 768px) {
+    .block-container {
+        padding: 1rem;
+    }
+
+    .dashboard-hero {
+        padding: 22px;
+    }
+
+    .dashboard-hero h2 {
+        font-size: 24px;
+    }
+}
+
+
+/* DASHBOARD POLISH */
+
+/* CLINIQ DASHBOARD ALIGNMENT */
+.dashboard-section {
+    margin: 26px 0 16px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #E5EDF3;
+    color: #10243A;
+    font-size: 19px;
+    font-weight: 750;
+    letter-spacing: -0.3px;
+}
+
+.metric-card {
+    min-height: 112px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+div[data-testid="stMetric"] {
+    height: 112px;
+    box-sizing: border-box;
+}
+
+[data-testid="stHorizontalBlock"] {
+    align-items: stretch;
+}
+
+[data-testid="stPlotlyChart"],
+[data-testid="stVegaLiteChart"] {
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+[data-testid="stDataFrame"] {
+    width: 100%;
+    border: 1px solid #E2EAF1;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+div.stButton > button {
+    min-height: 44px;
+    border-radius: 11px;
+    font-weight: 650;
+}
+
+@media (max-width: 768px) {
+    .dashboard-section {
+        margin-top: 20px;
+        font-size: 17px;
+    }
+
+    .metric-card,
+    div[data-testid="stMetric"] {
+        min-height: 90px;
+        height: auto;
+    }
+}
+
+[data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
+    gap: 16px;
+}
+
+div[data-testid="stMetric"] {
+    min-height: 95px;
+    justify-content: center;
+}
+
+[data-testid="stPlotlyChart"],
+[data-testid="stVegaLiteChart"] {
+    background: #FFFFFF;
+    border: 1px solid #E2EAF1;
+    border-radius: 15px;
+    padding: 12px;
+    box-shadow: 0 4px 14px rgba(16,36,58,0.04);
+}
+
+[data-testid="stSubheader"] {
+    color: #10243A;
+    font-weight: 750;
+}
+
+[data-testid="stCaptionContainer"] {
+    color: #718096;
+}
+
+.stProgress > div > div {
+    background-color: #0D9488;
+}
+
+
+
+/* CLINIQ DASHBOARD FINAL REFINEMENT */
+
+.dashboard-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 36px;
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+.dashboard-hero h2 {
+    margin-bottom: 10px;
+    letter-spacing: -0.6px;
+}
+
+.dashboard-section {
+    display: block;
+    padding: 0 0 11px 2px;
+    margin-top: 30px;
+    margin-bottom: 17px;
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.metric-card {
+    min-height: 118px;
+    padding: 22px;
+    border-radius: 16px;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.metric-card:hover {
+    box-shadow: 0 9px 24px rgba(16,36,58,0.09);
+    transform: translateY(-2px);
+}
+
+.metric-label {
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: 0.2px;
+    margin-bottom: 9px;
+}
+
+.metric-value {
+    color: #10243A;
+    font-size: 29px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+[data-testid="stDataFrame"] {
+    border: 1px solid #E2EAF1;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+[data-testid="stPlotlyChart"],
+[data-testid="stVegaLiteChart"] {
+    border: 1px solid #E2EAF1;
+    border-radius: 15px;
+    padding: 12px;
+    background: #FFFFFF;
+}
+
+@media (max-width: 768px) {
+    .dashboard-hero {
+        padding: 23px;
+    }
+
+    .metric-card {
+        min-height: 95px;
+        padding: 17px;
+    }
+
+    .metric-value {
+        font-size: 24px;
+    }
 }
 
 </style>
 """, unsafe_allow_html=True)
+
+
+
+
 
 
 # =========================================================
@@ -263,6 +643,21 @@ def get_status_count(visits, status):
 def show_detail(visit):
     st.markdown("### Visit Information")
 
+    st.html("""
+    <div style="
+        background:#F0F7FA;
+        border:1px solid #DCE9EF;
+        border-radius:13px;
+        padding:13px 17px;
+        margin-bottom:15px;
+        color:#34536A;
+        font-size:13px;
+    ">
+        Review registered information carefully. Clinical decisions and
+        priority assignments remain the responsibility of qualified nurses.
+    </div>
+    """)
+
     col1, col2 = st.columns(2)
 
     with col1:
@@ -275,9 +670,11 @@ def show_detail(visit):
         st.write("**Nurse Priority:**", get_value(visit, "nurse_priority", "Not assigned"))
         st.write("**Created:**", get_value(visit, "created_at"))
 
-    st.write("**Student Complaint:**")
-    st.write(get_value(visit, "complaint"))
+    st.markdown("#### Original Student Complaint")
 
+    complaint = get_value(visit, "complaint", "No complaint recorded.")
+
+    st.info(str(complaint))
 
 def format_created_at(value):
     if not value:
@@ -296,7 +693,7 @@ def format_created_at(value):
 
 with st.sidebar:
 
-    st.markdown("# ✚ CLINIQ")
+    st.markdown("# \u2728 CLINIQ")
     st.caption("SMART CLINIC MANAGEMENT")
 
     st.divider()
@@ -317,6 +714,7 @@ with st.sidebar:
             "Dashboard",
             "Register Visit",
             "Student Queue",
+            "CSV Upload & AI Processing",
             "Visit Details",
             "Appointment Management",
             "Clinic Reports",
@@ -330,27 +728,33 @@ with st.sidebar:
             "Dashboard",
             "Register Visit",
             "Student Queue",
+            "CSV Upload & AI Processing",
             "Visit Details",
             "Appointment Management",
             "Clinic Reports",
             "Visit History"
         ]
 
+   
     else:
-
         pages = [
             "Dashboard",
+            "Register Visit",
             "Student Queue",
+            "CSV Upload & AI Processing",
             "Visit Details",
             "Appointment Management",
             "Clinic Reports",
             "Visit History"
         ]
 
-    default_page = st.session_state.pop(
-        "dashboard_navigation",
-        "Dashboard"
-    )
+
+    requested_page = st.session_state.pop("dashboard_navigation", None)
+
+    if requested_page in pages:
+        st.session_state["main_navigation"] = requested_page
+
+    default_page = st.session_state.get("main_navigation", "Dashboard")
 
     if default_page not in pages:
         default_page = "Dashboard"
@@ -384,10 +788,181 @@ with st.sidebar:
 # =========================================================
 
 try:
+
+    # -------------------------------------------------
+    # API PERFORMANCE & COST MONITORING
+    # -------------------------------------------------
+
+    st.markdown("### API Performance & Cost Monitoring")
+    st.caption(
+        "Gemini API request activity, response time and estimated "
+        "paid-tier token cost."
+    )
+
+    api_log_path = "api_usage.jsonl"
+    api_records = []
+
+    try:
+        with open(api_log_path, "r", encoding="utf-8") as api_file:
+            for line in api_file:
+                try:
+                    record = json.loads(line.strip())
+                    if isinstance(record, dict):
+                        api_records.append(record)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+    except FileNotFoundError:
+        pass
+    except OSError:
+        st.warning("API usage log could not be read.")
+
+    today_api_records = []
+
+    for record in api_records:
+        try:
+            record_time = datetime.fromisoformat(
+                record.get("timestamp", "")
+            )
+
+            if record_time.date() == date.today():
+                today_api_records.append(record)
+
+        except (TypeError, ValueError):
+            continue
+
+    api_attempts = len(today_api_records)
+
+    api_responses = sum(
+        1 for record in today_api_records
+        if record.get("api_success") is True
+    )
+
+    api_latencies = [
+        float(record.get("latency_seconds", 0))
+        for record in today_api_records
+        if isinstance(record.get("latency_seconds"), (int, float))
+    ]
+
+    average_api_latency = (
+        sum(api_latencies) / len(api_latencies)
+        if api_latencies else 0
+    )
+
+    api_failures = api_attempts - api_responses
+
+    successful_api_records = [
+        record for record in today_api_records
+        if record.get("api_success") is True
+    ]
+
+    today_api_cost_usd = sum(
+        float(record.get("estimated_paid_cost_usd", 0) or 0)
+        for record in successful_api_records
+    )
+
+    today_input_tokens = sum(
+        int(record.get("input_tokens", 0) or 0)
+        for record in today_api_records
+    )
+
+    today_output_tokens = sum(
+        int(record.get("output_tokens", 0) or 0)
+        for record in today_api_records
+    )
+
+    # Indicative USD-INR reference rate for display.
+    usd_inr_rate = 92.89
+    today_api_cost_inr = today_api_cost_usd * usd_inr_rate
+
+    api_metric_columns = st.columns(5)
+
+    with api_metric_columns[0]:
+        metric_card("API Attempts Today", api_attempts)
+
+    with api_metric_columns[1]:
+        metric_card("Successful Requests", api_responses)
+
+    with api_metric_columns[2]:
+        metric_card("Failed Requests", api_failures)
+
+    with api_metric_columns[3]:
+        metric_card(
+            "Average API Call Time",
+            f"{average_api_latency:.2f} sec"
+            if api_latencies else "No data"
+        )
+
+    with api_metric_columns[4]:
+        metric_card(
+            "Estimated Daily Cost",
+            f"${today_api_cost_usd:.6f}"
+        )
+
+    st.caption(
+        f"Estimated INR equivalent: INR {today_api_cost_inr:.4f} "
+        f"| Reference rate: INR {usd_inr_rate:.2f} per USD."
+    )
+
+    token_col1, token_col2 = st.columns(2)
+
+    with token_col1:
+        metric_card("Input Tokens Today", today_input_tokens)
+
+    with token_col2:
+        metric_card("Output Tokens Today", today_output_tokens)
+
+    if not today_api_records:
+        st.info(
+            "No Gemini API requests have been recorded today. "
+            "Usage metrics will appear after AI classification requests."
+        )
+
+    elif today_input_tokens == 0 and today_output_tokens == 0:
+        st.warning(
+            "API requests were recorded, but token usage metadata was "
+            "not returned. Cost may therefore be understated."
+        )
+
+    if today_api_records:
+        with st.expander("View today's API request details"):
+            api_detail_rows = []
+
+            for record in reversed(today_api_records[-20:]):
+                api_detail_rows.append({
+                    "Time": str(record.get("timestamp", ""))[:19],
+                    "Model": record.get("model", "Unknown"),
+                    "Response Received": (
+                        "Yes" if record.get("api_success") else "No"
+                    ),
+                    "Response Time (sec)": record.get(
+                        "latency_seconds", 0
+                    ),
+                    "Input Tokens": record.get("input_tokens", 0),
+                    "Output Tokens": record.get("output_tokens", 0),
+                    "Estimated Cost (USD)": record.get(
+                        "estimated_paid_cost_usd", 0
+                    )
+                })
+
+            st.dataframe(
+                pd.DataFrame(api_detail_rows),
+                width="stretch",
+                hide_index=True
+            )
+
+    st.caption(
+        "Cost is an estimated paid-tier equivalent based on recorded token "
+        "usage, not an actual invoice. Free-tier usage may be charged at "
+        "zero within applicable limits. INR conversion is indicative."
+    )
+
+    st.markdown("---")
+
     visits = backend.get_all_visits() or []
 except Exception as error:
     visits = []
     st.error(f"Unable to load visits: {error}")
+
 
 
 
@@ -397,491 +972,1420 @@ except Exception as error:
 
 if page == "Dashboard":
 
-    # -----------------------------------------------------
-    # WELCOME HEADER
-    # -----------------------------------------------------
+    # =====================================================
+    # CLINIQ QUEUE DASHBOARD - INSPIRED BY THE REFERENCE UI
+    # Uses existing CLINIQ visit and appointment data only.
+    # =====================================================
+
+    st.html("""
+    <style>
+    /* Dashboard canvas and compact header */
+    [data-testid="stAppViewContainer"] { background: #F3F6FA; }
+    [data-testid="stAppViewBlockContainer"] {
+        max-width: 1600px !important;
+        padding-top: 0.8rem !important;
+        padding-bottom: 1.5rem !important;
+    }
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg,#0B1830 0%,#102744 100%);
+        border-right: 1px solid #1D3554;
+    }
+    [data-testid="stSidebar"] * { color: #EAF2FC; }
+    [data-testid="stSidebar"] [data-testid="stRadio"] label {
+        padding: 8px 10px; border-radius: 8px;
+    }
+    [data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+        background: rgba(255,255,255,.10);
+    }
+    .cl-topbar {
+        display:flex; justify-content:space-between; align-items:center;
+        background:#FFFFFF; border:1px solid #E6ECF2; border-radius:10px;
+        padding:11px 17px; margin:0 0 13px 0;
+        color:#15263E; font-size:13px; font-weight:750;
+        box-shadow:0 2px 8px rgba(20,40,65,.035);
+    }
+    .cl-topbar small { color:#8492A4; font-weight:500; }
+    /* Main live queue banner */
+    .cl-live-hero {
+        display:grid; grid-template-columns:1.05fr 1.15fr .48fr;
+        gap:18px; align-items:stretch;
+        background:linear-gradient(112deg,#0A1934 0%,#102544 58%,#0C2945 100%);
+        color:white; border:1px solid #203B5C; border-radius:11px;
+        padding:19px 22px; min-height:145px;
+        box-shadow:0 7px 18px rgba(9,25,49,.14);
+        margin-bottom:14px;
+    }
+    .cl-live-label {
+        color:#22C7BE; font-size:10px; letter-spacing:1.4px;
+        font-weight:850; text-transform:uppercase; margin-bottom:5px;
+    }
+    .cl-live-token {
+        color:#FFFFFF; font-size:48px; line-height:1.05;
+        font-weight:900; letter-spacing:-1.6px;
+    }
+    .cl-live-at { color:#5DD8D0; font-size:10px; font-weight:800; margin:5px 0 2px; }
+    .cl-live-counter { color:#20C5BD; font-size:20px; font-weight:850; }
+    .cl-live-dept { color:#C7D4E3; font-size:12px; margin-top:2px; }
+    .cl-wait-list { border-left:1px solid rgba(210,230,250,.17);
+        border-right:1px solid rgba(210,230,250,.17); padding:0 17px; }
+    .cl-wait-row {
+        display:flex; justify-content:space-between; gap:12px;
+        padding:5px 0; border-bottom:1px solid rgba(210,230,250,.10);
+        color:#EAF2FC; font-size:11px;
+    }
+    .cl-wait-row span:last-child { color:#27C7BE; font-weight:750; }
+    .cl-live-time { text-align:center; display:flex; flex-direction:column;
+        justify-content:center; color:#FFFFFF; }
+    .cl-live-time .clock { font-size:22px; font-weight:850; }
+    .cl-live-time .date { color:#B8C7D8; font-size:10px; margin-top:4px; }
+    .cl-live-time .thanks { color:#28C9BE; font-size:11px; font-weight:800; margin-top:15px; }
+    /* White dashboard panels */
+    .cl-panel {
+        background:#FFFFFF; border:1px solid #E4EAF1; border-radius:10px;
+        padding:14px 15px; box-shadow:0 3px 12px rgba(20,40,65,.045);
+        min-height:100px; margin-bottom:12px;
+    }
+    .cl-panel-title { color:#172A42; font-size:13px; font-weight:850; margin-bottom:3px; }
+    .cl-panel-sub { color:#91A0B0; font-size:10px; margin-bottom:10px; }
+    .cl-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; }
+    .cl-stat { text-align:center; padding:8px 4px; border-right:1px solid #EEF1F5; }
+    .cl-stat:last-child { border-right:0; }
+    .cl-stat-icon { width:29px; height:29px; margin:0 auto 5px; border-radius:50%;
+        display:flex; align-items:center; justify-content:center; font-size:14px; }
+    .cl-stat-value { color:#172A42; font-size:20px; font-weight:900; line-height:1.1; }
+    .cl-stat-label { color:#65758A; font-size:10px; font-weight:700; margin-top:3px; }
+    .cl-stat-caption { color:#98A5B3; font-size:9px; }
+    .cl-chip { display:inline-block; padding:3px 8px; border-radius:20px;
+        background:#E7F7F3; color:#16866F; font-size:9px; font-weight:800; }
+    .cl-table-row { display:flex; justify-content:space-between; gap:8px;
+        border-bottom:1px solid #EEF2F6; padding:7px 0; font-size:10px; color:#526276; }
+    .cl-table-row strong { color:#26384F; font-weight:750; }
+    .cl-empty { padding:18px 10px; text-align:center; border:1px dashed #D7E0E9;
+        border-radius:8px; color:#8A98A8; font-size:11px; }
+    @media(max-width:900px) {
+        .cl-live-hero { grid-template-columns:1fr; }
+        .cl-wait-list { border:0; border-top:1px solid rgba(210,230,250,.17);
+            border-bottom:1px solid rgba(210,230,250,.17); padding:12px 0; }
+        .cl-stat-grid { grid-template-columns:repeat(2,1fr); }
+    }
+
+    /* FINAL DASHBOARD VISUAL POLISH */
+    .cl-topbar {
+        min-height: 48px;
+        padding: 12px 20px;
+        border-radius: 12px;
+    }
+
+    .cl-live-hero {
+        border-radius: 14px;
+        padding: 23px 25px;
+        min-height: 158px;
+        box-shadow: 0 9px 25px rgba(9,25,49,.16);
+    }
+
+    .cl-panel {
+        border-radius: 13px;
+        padding: 17px;
+        box-shadow: 0 4px 15px rgba(20,40,65,.055);
+    }
+
+    .cl-panel-title {
+        font-size: 14px;
+        letter-spacing: .1px;
+    }
+
+    .cl-stat {
+        padding: 12px 5px;
+    }
+
+    .cl-stat-icon {
+        width: 34px;
+        height: 34px;
+        font-size: 17px;
+    }
+
+    .cl-stat-value {
+        font-size: 23px;
+    }
+
+    [data-testid="stVegaLiteChart"],
+    [data-testid="stPlotlyChart"],
+    [data-testid="stArrowVegaLiteChart"] {
+        background: #FFFFFF;
+        border: 1px solid #E4EAF1;
+        border-radius: 12px;
+        padding: 10px;
+        box-shadow: 0 3px 12px rgba(20,40,65,.04);
+    }
+
+    [data-testid="stDataFrame"] {
+        border: 1px solid #E4EAF1;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    [data-testid="stButton"] button {
+        min-height: 43px;
+        border-radius: 9px;
+        font-weight: 700;
+    }
+
+    @media(max-width: 900px) {
+        .cl-live-hero {
+            padding: 17px;
+        }
+        .cl-stat-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    /* CLINIQ PROFESSIONAL DASHBOARD */
+    .cl-topbar {
+        min-height: 54px;
+        padding: 14px 22px;
+        border-radius: 12px;
+        font-size: 14px;
+        box-shadow: 0 4px 14px rgba(16,36,58,.06);
+    }
+
+    .cl-live-hero {
+        grid-template-columns: 1fr 1.2fr .65fr;
+        gap: 22px;
+        min-height: 175px;
+        padding: 25px 28px;
+        border-radius: 16px;
+        box-shadow: 0 10px 28px rgba(9,25,49,.17);
+    }
+
+    .cl-live-token {
+        font-size: 54px;
+        letter-spacing: -1px;
+    }
+
+    .cl-live-label {
+        font-size: 11px;
+        letter-spacing: 1.5px;
+    }
+
+    .cl-panel {
+        padding: 19px;
+        min-height: 115px;
+        border: 1px solid #E1E8F0;
+        border-radius: 14px;
+        box-shadow: 0 5px 18px rgba(16,36,58,.055);
+        margin-bottom: 14px;
+    }
+
+    .cl-panel-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: #10243A;
+        margin-bottom: 5px;
+    }
+
+    .cl-panel-sub {
+        font-size: 11px;
+        color: #77869A;
+        margin-bottom: 13px;
+    }
+
+    .cl-stat-grid {
+        gap: 14px;
+    }
+
+    .cl-stat {
+        padding: 14px 7px;
+    }
+
+    .cl-stat-icon {
+        width: 38px;
+        height: 38px;
+        font-size: 18px;
+        margin-bottom: 9px;
+    }
+
+    .cl-stat-value {
+        font-size: 26px;
+        font-weight: 850;
+    }
+
+    .cl-stat-label {
+        font-size: 12px;
+        font-weight: 750;
+        color: #40536A;
+    }
+
+    .cl-stat-caption {
+        font-size: 10px;
+    }
+
+    .cl-empty {
+        padding: 25px 14px;
+        background: #F8FAFC;
+        border: 1px dashed #CBD7E3;
+        border-radius: 11px;
+        color: #718096;
+        font-size: 12px;
+    }
+
+    [data-testid="stDataFrame"] {
+        border: 1px solid #E1E8F0;
+        border-radius: 11px;
+        overflow: hidden;
+    }
+
+    [data-testid="stButton"] button {
+        min-height: 44px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 750;
+    }
+
+    [data-testid="stAlert"] {
+        border-radius: 11px;
+    }
+
+    @media(max-width: 900px) {
+        .cl-live-hero {
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        .cl-stat-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    /* FINAL CHART PANEL FINISH */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background: #FFFFFF;
+        border: 1px solid #E1E8F0 !important;
+        border-radius: 14px !important;
+        padding: 15px 17px 12px 17px;
+        box-shadow: 0 5px 18px rgba(16,36,58,.05);
+    }
+
+    [data-testid="stVerticalBlockBorderWrapper"] h4 {
+        color: #10243A;
+        font-size: 15px;
+        font-weight: 800;
+        margin-bottom: 2px;
+    }
+
+    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCaptionContainer"] {
+        color: #7B899B;
+        font-size: 11px;
+    }
+
+    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVegaLiteChart"],
+    [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stArrowVegaLiteChart"] {
+        border: 0;
+        box-shadow: none;
+        padding: 0;
+    }
+
+    /* =========================================
+       CLINIQ FINAL DASHBOARD REFINEMENT
+    ========================================= */
+
+    .cl-topbar {
+        color: #10243A;
+        font-size: 14px;
+        font-weight: 750;
+    }
+
+    .cl-topbar small {
+        font-size: 12px;
+    }
+
+    .cl-live-hero {
+        gap: 24px;
+        padding: 27px 30px;
+    }
+
+    .cl-live-label {
+        color: #A9C4D9;
+        font-weight: 800;
+    }
+
+    .cl-live-token {
+        line-height: 1.15;
+        font-weight: 850;
+    }
+
+    .cl-live-time .clock {
+        font-size: 27px;
+        font-weight: 800;
+    }
+
+    .cl-panel {
+        background: #FFFFFF;
+        transition: box-shadow .2s ease, transform .2s ease;
+    }
+
+    .cl-panel-title {
+        font-size: 16px;
+        letter-spacing: -0.2px;
+    }
+
+    .cl-panel-sub {
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .cl-stat-grid {
+        align-items: stretch;
+        gap: 16px;
+    }
+
+    .cl-stat {
+        min-width: 0;
+        padding: 16px 8px;
+    }
+
+    .cl-stat-value {
+        font-size: 28px;
+        line-height: 1.25;
+    }
+
+    .cl-stat-label {
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .cl-stat-caption {
+        font-size: 11px;
+        line-height: 1.4;
+        margin-top: 3px;
+    }
+
+    .cl-empty {
+        min-height: 115px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1.6;
+    }
+
+    /* Dashboard chart and lower-panel headings */
+    [data-testid="stVerticalBlockBorderWrapper"] h4 {
+        font-size: 16px;
+        letter-spacing: -0.2px;
+    }
+
+    [data-testid="stVerticalBlockBorderWrapper"]
+    [data-testid="stCaptionContainer"] {
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    /* Dashboard tables */
+    [data-testid="stDataFrame"] {
+        border-radius: 12px;
+        border-color: #DCE6EF;
+    }
+
+    /* Quick action buttons */
+    div[data-testid="stButton"] > button {
+        min-height: 48px;
+        font-size: 14px;
+        font-weight: 750;
+        border-radius: 12px;
+        transition: all .2s ease;
+    }
+
+    div[data-testid="stButton"] > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 14px rgba(16,36,58,.09);
+    }
+
+    /* Responsive dashboard */
+    @media (max-width: 900px) {
+        .cl-live-hero {
+            padding: 20px;
+        }
+
+        .cl-live-token {
+            font-size: 42px;
+        }
+
+        .cl-stat-grid {
+            gap: 8px;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .cl-topbar {
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px;
+        }
+
+        .cl-live-hero {
+            padding: 17px;
+            gap: 14px;
+        }
+
+        .cl-stat-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .cl-stat {
+            border-right: 0;
+            border-bottom: 1px solid #EEF1F5;
+        }
+
+        .cl-stat-value {
+            font-size: 24px;
+        }
+    }
+
+    </style>
+    """)
 
     current_time = datetime.now()
-    current_hour = current_time.hour
-
-    if current_hour < 12:
-        greeting = "Good Morning"
-    elif current_hour < 17:
-        greeting = "Good Afternoon"
-    else:
-        greeting = "Good Evening"
-
-    st.markdown(
-        f"""
-        <div class="dashboard-hero">
-            <h2>{greeting}, {html.escape(st.session_state.username)}! 👋</h2>
-            <p>
-                Welcome to CLINIQ Smart Clinic Management System.
-                Here's your clinic activity overview.
-            </p>
-            <p>
-                📅 {current_time.strftime("%A, %d %B %Y")}
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # -----------------------------------------------------
-    # PROCESS VISIT DATA
-    # -----------------------------------------------------
-
     today = date.today()
 
+    try:
+        visits = backend.get_all_visits() or []
+    except Exception as error:
+        visits = []
+        st.error(f"Unable to load clinic visits: {error}")
+
+    try:
+        appointments = backend.get_all_appointments() or []
+    except Exception:
+        appointments = []
+
+    # Normalise visit dates and calculate dashboard figures.
+    dated_visits = []
     today_visits = []
-
     for visit in visits:
-        created = get_value(visit, "created_at")
-
-        try:
-            visit_date = pd.to_datetime(created).date()
-
-            if visit_date == today:
+        created = pd.to_datetime(get_value(visit, "created_at", ""), errors="coerce")
+        if pd.notna(created):
+            dated_visits.append((created, visit))
+            if created.date() == today:
                 today_visits.append(visit)
 
-        except Exception:
-            pass
+    waiting_visits = [
+        v for v in visits
+        if str(get_value(v, "status", "")).strip().lower() == "waiting"
+    ]
+    completed_visits = [
+        v for v in visits
+        if str(get_value(v, "status", "")).strip().lower() == "completed"
+    ]
+    consultation_visits = [
+        v for v in visits
+        if str(get_value(v, "status", "")).strip().lower()
+        in ("in consultation", "in-consultation", "consulting")
+    ]
+    pending_reviews = [
+        v for v in visits if not get_value(v, "nurse_priority")
+    ]
 
-    total = len(visits)
+    def _esc(value):
+        return html.escape(str(value if value not in (None, "") else "—"))
 
-    waiting = get_status_count(visits, "Waiting")
-
-    consultation = get_status_count(
-        visits,
-        "In Consultation"
+    # Most recent waiting record is displayed as the current queue token.
+    latest_waiting = sorted(
+        waiting_visits,
+        key=lambda v: str(get_value(v, "created_at", "")),
+        reverse=True
     )
-
-    completed = get_status_count(
-        visits,
-        "Completed"
+    now_serving = (
+        get_value(latest_waiting[0], "id", "—") if latest_waiting else "—"
     )
+    username = _esc(st.session_state.get("username", "Staff"))
+    role_name = _esc(st.session_state.get("role", "Staff"))
 
-    # -----------------------------------------------------
-    # STATISTICS CARDS
-    # -----------------------------------------------------
+    st.html(f"""
+    <div class="cl-topbar">
+        <span>CLINIQ <small>/ Smart Clinic Management</small></span>
+        <span>{username} &nbsp; <small>{role_name}</small></span>
+    </div>
+    """)
 
-    st.markdown(
-        '<div class="dashboard-section">Clinic Statistics</div>',
-        unsafe_allow_html=True
-    )
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        metric_card("📋 Total Visits", total)
-
-    with col2:
-        metric_card("📅 Today's Visits", len(today_visits))
-
-    with col3:
-        metric_card("⏳ Waiting", waiting)
-
-    with col4:
-        metric_card("✓ Completed", completed)
-
-    # -----------------------------------------------------
-    # ADDITIONAL STATISTICS
-    # -----------------------------------------------------
-
-    st.markdown(
-        '<div class="dashboard-section">Activity Overview</div>',
-        unsafe_allow_html=True
-    )
-
-    activity1, activity2, activity3 = st.columns(3)
-
-    with activity1:
-        metric_card(
-            "🩺 In Consultation",
-            consultation
-        )
-
-    with activity2:
-        metric_card(
-            "👩‍⚕️ Nurse Reviews",
-            sum(
-                1 for visit in visits
-                if not get_value(visit, "nurse_priority")
-            )
-        )
-
-    with activity3:
-        completion_rate = (
-            round((completed / total) * 100, 1)
-            if total > 0 else 0
-        )
-
-        metric_card(
-            "📊 Completion Rate",
-            f"{completion_rate}%"
-        )
-
-    # -----------------------------------------------------
-    # NURSE PRIORITY OVERVIEW
-    # -----------------------------------------------------
-
-    st.markdown("---")
-
-    st.markdown(
-        '<div class="dashboard-section">Nurse Priority Overview</div>',
-        unsafe_allow_html=True
-    )
-
-    st.caption(
-        "Priority values are assigned by the nurse, "
-        "not automatically by the system."
-    )
-
-    p1, p2, p3 = st.columns(3)
-
-    with p1:
-        metric_card(
-            "🔴 See Now",
-            get_priority_count(visits, "See Now")
-        )
-
-    with p2:
-        metric_card(
-            "🟠 Today",
-            get_priority_count(visits, "Today")
-        )
-
-    with p3:
-        metric_card(
-            "🟢 Routine",
-            get_priority_count(visits, "Routine")
-        )
-
-    # -----------------------------------------------------
-    # CHARTS
-    # -----------------------------------------------------
-
-    st.markdown("---")
-
-    st.markdown(
-        '<div class="dashboard-section">Clinic Analytics</div>',
-        unsafe_allow_html=True
-    )
-
-    chart1, chart2 = st.columns(2)
-
-    with chart1:
-
-        st.subheader("Visit Status")
-
-        status_data = pd.DataFrame({
-            "Status": [
-                "Waiting",
-                "In Consultation",
-                "Completed"
-            ],
-            "Visits": [
-                waiting,
-                consultation,
-                completed
-            ]
-        })
-
-        st.bar_chart(
-            status_data.set_index("Status"),
-            height=300,
-            width="stretch"
-        )
-
-    with chart2:
-
-        st.subheader("Nurse Priority Distribution")
-
-        priority_data = pd.DataFrame({
-            "Priority": [
-                "See Now",
-                "Today",
-                "Routine"
-            ],
-            "Visits": [
-                get_priority_count(visits, "See Now"),
-                get_priority_count(visits, "Today"),
-                get_priority_count(visits, "Routine")
-            ]
-        })
-
-        st.bar_chart(
-            priority_data.set_index("Priority"),
-            height=300,
-            width="stretch"
-        )
-
-    # -----------------------------------------------------
-    # RECENT STUDENT VISITS
-    # -----------------------------------------------------
-
-    st.markdown("---")
-
-    st.markdown(
-        '<div class="dashboard-section">Recent Student Visits</div>',
-        unsafe_allow_html=True
-    )
-
-    st.caption(
-        "The latest registered student visits."
-    )
-
-    if visits:
-
-        recent = sorted(
-            visits,
-            key=lambda x: str(
-                get_value(x, "created_at")
-            ),
-            reverse=True
-        )[:10]
-
-        recent_df = pd.DataFrame(recent)
-
-        display_columns = [
-            column for column in [
-                "id",
-                "student_name",
-                "student_id",
-                "nurse_priority",
-                "status",
-                "created_at"
-            ]
-            if column in recent_df.columns
-        ]
-
-        if display_columns:
-
-            recent_display = recent_df[
-                display_columns
-            ].copy()
-
-            if "created_at" in recent_display.columns:
-                recent_display["created_at"] = (
-                    pd.to_datetime(
-                        recent_display["created_at"],
-                        errors="coerce"
-                    ).dt.strftime("%d %b %Y, %I:%M %p")
-                )
-
-                recent_display["created_at"] = (
-                    recent_display["created_at"]
-                    .fillna("Unknown")
-                )
-
-            recent_display = recent_display.rename(
-                columns={
-                    "id": "Visit ID",
-                    "student_name": "Student Name",
-                    "student_id": "Student ID",
-                    "nurse_priority": "Nurse Priority",
-                    "status": "Visit Status",
-                    "created_at": "Registered At"
-                }
-            )
-
-            st.dataframe(
-                recent_display,
-                width="stretch",
-                hide_index=True
-            )
-
-        else:
-            st.info(
-                "Visit records are available, "
-                "but the expected display columns were not found."
-            )
-
+    wait_rows = ""
+    if latest_waiting:
+        for item in latest_waiting[:8]:
+            token = _esc(get_value(item, "id", "—"))
+            priority = _esc(get_value(item, "nurse_priority", "Awaiting nurse review") or "Awaiting nurse review")
+            wait_rows += f'<div class="cl-wait-row"><span>{token}</span><span>{priority}</span></div>'
     else:
+        wait_rows = '<div class="cl-wait-row"><span>No waiting visits</span><span>Queue clear</span></div>'
 
-        st.info(
-            "No student visits have been registered yet. "
-            "Register your first visit to see dashboard statistics."
-        )
+    st.html(f"""
+    <section class="cl-live-hero">
+        <div>
+            <div class="cl-live-label">LATEST WAITING QUEUE</div>
+            <div class="cl-live-token">{_esc(now_serving)}</div>
+            <div class="cl-live-at">QUEUE STATUS</div>
+            <div class="cl-live-counter">WAITING / REVIEW</div>
+            <div class="cl-live-dept">Latest waiting visit token</div>
+        </div>
+        <div class="cl-wait-list">
+            <div class="cl-live-label">WAITING TOKENS</div>
+            {wait_rows}
+        </div>
+        <div class="cl-live-time">
+            <div>◷</div>
+            <div class="clock">{current_time.strftime("%I:%M %p")}</div>
+            <div class="date">{current_time.strftime("%d %b %Y")}<br>{current_time.strftime("%A")}</div>
+            <div class="thanks">CLINIQ / THANK YOU</div>
+            <div class="date">Please keep your visit details ready</div>
+        </div>
+    </section>
+    """)
 
-    # -----------------------------------------------------
-    # QUICK ACTIONS
-    # -----------------------------------------------------
+    # Main overview row, styled to match the reference dashboard.
+    stat_items = [
+        (chr(0x1F465), len(visits), "Total Visits", "All registered", "#E8F1FB", "#3779B8"),
+        (chr(0x1F4C5), len(today_visits), "Today's Visits", "Registered today", "#EAF3FF", "#397CC0"),
+        (chr(0x23F3), len(waiting_visits), "Waiting", "Currently in queue", "#FFF4DF", "#D89A32"),
+        (chr(0x2713), len(completed_visits), "Completed", "Marked completed", "#E8F7F0", "#269A70"),
+    ]
+    stat_html = ""
+    for icon, value, label, caption, bg, fg in stat_items:
+        stat_html += f"""
+        <div class="cl-stat">
+            <div class="cl-stat-icon" style="background:{bg};color:{fg}">{icon}</div>
+            <div class="cl-stat-value">{value}</div>
+            <div class="cl-stat-label">{label}</div>
+            <div class="cl-stat-caption">{caption}</div>
+        </div>
+        """
 
-    st.markdown("---")
+    st.html(f"""
+    <div class="cl-panel">
+        <div class="cl-panel-title">Live Overview</div>
+        <div class="cl-panel-sub">Current clinic activity at a glance</div>
+        <div class="cl-stat-grid">{stat_html}</div>
+    </div>
+    """)
 
-    st.markdown(
-        '<div class="dashboard-section">Quick Actions</div>',
-        unsafe_allow_html=True
+    left_chart, right_chart = st.columns([0.92, 1.55], gap="medium")
+
+    with left_chart:
+        with st.container(border=True):
+            st.markdown("#### Visit Queue Summary")
+            st.caption("Current clinic workflow by visit status")
+
+            if visits:
+                status_summary = pd.DataFrame({
+                    "Visit Status": ["Waiting", "In Consultation", "Completed"],
+                    "Count": [
+                        len(waiting_visits),
+                        len(consultation_visits),
+                        len(completed_visits)
+                    ]
+                }).set_index("Visit Status")
+
+                st.bar_chart(
+                    status_summary,
+                    height=245,
+                    color="#0D9488",
+                    horizontal=True
+                )
+            else:
+                st.markdown(
+                    '<div class="cl-empty">Visit status analytics will appear '
+                    'after student visits are registered.</div>',
+                    unsafe_allow_html=True
+                )
+
+    with right_chart:
+        with st.container(border=True):
+            st.markdown("#### Visit Activity")
+            st.caption("Daily registrations across the latest seven available days")
+
+            if dated_visits:
+                activity = pd.DataFrame([
+                    {"Date": created.date().isoformat(), "Visits": 1}
+                    for created, _ in dated_visits
+                ])
+
+                activity = (
+                    activity.groupby("Date", as_index=False)["Visits"]
+                    .sum()
+                    .sort_values("Date")
+                    .tail(7)
+                )
+
+                activity["Date"] = pd.to_datetime(
+                    activity["Date"]
+                ).dt.strftime("%d %b")
+
+                st.bar_chart(
+                    activity,
+                    x="Date",
+                    y="Visits",
+                    height=245,
+                    color="#0D9488"
+                )
+            else:
+                st.markdown(
+                    '<div class="cl-empty">Your clinic activity chart will '
+                    'appear here after visits are registered.</div>',
+                    unsafe_allow_html=True
+                )
+
+    # Professional lower dashboard panels
+    q1, q2, q3 = st.columns([1, 1, 1.25], gap="medium")
+
+    with q1:
+        with st.container(border=True):
+            st.markdown("#### Nurse Priority")
+            st.caption("Staff-assigned visit priorities")
+
+            priority_table = pd.DataFrame({
+                "Priority": ["See Now", "Today", "Routine", "Not assigned"],
+                "Visits": [
+                    get_priority_count(visits, "See Now"),
+                    get_priority_count(visits, "Today"),
+                    get_priority_count(visits, "Routine"),
+                    len(pending_reviews)
+                ]
+            })
+            st.dataframe(
+                priority_table,
+                hide_index=True,
+                width="stretch",
+                height=190
+            )
+
+    with q2:
+        with st.container(border=True):
+            st.markdown("#### Department Queue")
+            st.caption("Visit distribution by student department")
+
+            department_counts = {}
+            for visit in visits:
+                department = (
+                    get_value(visit, "department", "")
+                    or get_value(visit, "student_department", "")
+                    or "Not specified"
+                )
+                department_counts[str(department)] = (
+                    department_counts.get(str(department), 0) + 1
+                )
+
+            if department_counts and any(
+                name != "Not specified" for name in department_counts
+            ):
+                department_df = pd.DataFrame([
+                    {"Department": name, "Visits": count}
+                    for name, count in sorted(
+                        department_counts.items(),
+                        key=lambda x: x[1],
+                        reverse=True
+                    )
+                ])
+                st.bar_chart(
+                    department_df.set_index("Department"),
+                    height=190,
+                    color="#397CC0"
+                )
+            else:
+                st.markdown(
+                    '<div class="cl-empty">Department information will appear '
+                    'when available in visit records.</div>',
+                    unsafe_allow_html=True
+                )
+
+    with q3:
+        with st.container(border=True):
+            st.markdown("#### Recent Student Visits")
+            st.caption("Latest six registered clinic visits")
+
+            recent = sorted(
+                visits,
+                key=lambda v: str(get_value(v, "created_at", "")),
+                reverse=True
+            )[:6]
+
+            if recent:
+                recent_rows = []
+                for item in recent:
+                    recent_rows.append({
+                        "Student": get_value(item, "student_name", "?"),
+                        "Status": get_value(item, "status", "?"),
+                        "Priority": get_value(item, "nurse_priority", "?") or "?"
+                    })
+
+                st.dataframe(
+                    pd.DataFrame(recent_rows),
+                    hide_index=True,
+                    width="stretch",
+                    height=190
+                )
+            else:
+                st.markdown(
+                    '<div class="cl-empty">No student visits registered yet.</div>',
+                    unsafe_allow_html=True
+                )
+
+    st.caption(
+        f"Appointments recorded: {len(appointments)} | "
+        f"Nurse reviews pending: {len(pending_reviews)} | "
+        "Clinical decisions remain with qualified clinic staff."
     )
 
-    action1, action2, action3 = st.columns(3)
+    st.markdown("### Quick Actions")
+    st.caption("Open important clinic workflows directly from your dashboard.")
+
+    def dashboard_go_to(target_page):
+        st.session_state["dashboard_navigation"] = target_page
+
+    action1, action2, action3 = st.columns(3, gap="medium")
 
     with action1:
-        if st.button(
-            "➕ Register New Visit",
-            width="stretch"
-        ):
-            st.session_state.dashboard_navigation = "Register Visit"
-            st.rerun()
+        st.button(
+            "Register New Visit",
+            key="dashboard_register_action",
+            width="stretch",
+            on_click=dashboard_go_to,
+            args=("Register Visit",)
+        )
 
     with action2:
-        if st.button(
-            "📋 Open Student Queue",
-            width="stretch"
-        ):
-            st.session_state.dashboard_navigation = "Student Queue"
-            st.rerun()
+        st.button(
+            "Open Student Queue",
+            key="dashboard_queue_action",
+            width="stretch",
+            on_click=dashboard_go_to,
+            args=("Student Queue",)
+        )
 
     with action3:
-        if st.button(
-            "📅 Manage Appointments",
-            width="stretch"
-        ):
-            st.session_state.dashboard_navigation = "Appointment Management"
-            st.rerun()
+        st.button(
+            "Manage Appointments",
+            key="dashboard_appointments_action",
+            width="stretch",
+            on_click=dashboard_go_to,
+            args=("Appointment Management",)
+        )
 
+    st.info(
+        "CLINIQ is an administrative support system. AI classifications "
+        "are not diagnoses or medical advice. Qualified nurses must "
+        "review every visit and make all clinical decisions."
+    )
 
-
-# =========================================================
-# REGISTER VISIT
-# =========================================================
 
 elif page == "Register Visit":
 
-    st.title("✚ Register Student Visit")
-    st.caption(
-        "Register a student visit and add it to the clinic queue."
-    )
-
-    st.markdown("---")
-
     # -----------------------------------------------------
-    # REGISTRATION INFORMATION
+    # PREMIUM PAGE STYLING
     # -----------------------------------------------------
 
-    left, right = st.columns([1.5, 1], gap="large")
+    st.html("""
+    <style>
+    .cliniq-hero {
+        background: linear-gradient(120deg,#10243A,#164E63);
+        color: white;
+        padding: 34px;
+        border-radius: 20px;
+        margin-bottom: 25px;
+        box-shadow: 0 12px 30px rgba(16,36,58,.13);
+    }
+    .cliniq-kicker {
+        color:#99F6E4;
+        font-size:11px;
+        font-weight:800;
+        letter-spacing:2px;
+    }
+    .cliniq-heading {
+        font-size:32px;
+        font-weight:850;
+        margin:12px 0 8px;
+    }
+    .cliniq-subtitle {
+        color:#D5E8F0;
+        font-size:14px;
+        line-height:1.7;
+    }
+    .cliniq-pill {
+        display:inline-block;
+        margin-top:18px;
+        padding:8px 13px;
+        border:1px solid #5EEAD4;
+        border-radius:30px;
+        color:#99F6E4;
+        font-size:11px;
+        font-weight:750;
+    }
+    .cliniq-section {
+        color:#0D9488;
+        font-size:11px;
+        font-weight:850;
+        letter-spacing:1.5px;
+    }
+    .cliniq-title {
+        color:#10243A;
+        font-size:23px;
+        font-weight:800;
+        margin:5px 0;
+    }
+    .cliniq-description {
+        color:#718096;
+        font-size:13px;
+        line-height:1.7;
+        margin-bottom:17px;
+    }
+    .cliniq-info {
+        background:#F0FDFA;
+        border:1px solid #CCFBF1;
+        border-left:4px solid #0D9488;
+        border-radius:10px;
+        padding:15px;
+        color:#285E59;
+        font-size:13px;
+        line-height:1.7;
+        margin:12px 0;
+    }
+    .cliniq-warning {
+        background:#FFFAEB;
+        border:1px solid #F6E3AE;
+        border-radius:12px;
+        padding:16px;
+        color:#805B16;
+        font-size:13px;
+        line-height:1.7;
+    }
+    .cliniq-step {
+        display:flex;
+        align-items:center;
+        gap:13px;
+        padding:13px 0;
+        border-bottom:1px solid #EDF2F7;
+    }
+    .cliniq-step-number {
+        min-width:38px;
+        height:38px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        background:#E6FFFA;
+        color:#0D9488;
+        border-radius:11px;
+        font-size:12px;
+        font-weight:850;
+    }
+    .cliniq-step-title {
+        color:#243B53;
+        font-size:13px;
+        font-weight:750;
+    }
+    .cliniq-step-description {
+        color:#718096;
+        font-size:11px;
+        margin-top:3px;
+    }
+    .cliniq-priority {
+        display:flex;
+        align-items:center;
+        gap:12px;
+        padding:13px 0;
+        border-bottom:1px solid #EDF2F7;
+    }
+    .cliniq-dot {
+        width:12px;
+        height:12px;
+        border-radius:50%;
+        flex-shrink:0;
+    }
+    .cliniq-priority-name {
+        color:#243B53;
+        font-size:13px;
+        font-weight:750;
+    }
+    .cliniq-priority-description {
+        color:#718096;
+        font-size:11px;
+        margin-top:3px;
+    }
+    .cliniq-workflow {
+        background:linear-gradient(135deg,#F0FDFA,#F8FAFC);
+        border:1px solid #D7F0EB;
+        border-radius:13px;
+        padding:17px;
+        margin:12px 0;
+    }
+    .cliniq-workflow-title {
+        color:#10243A;
+        font-size:13px;
+        font-weight:800;
+    }
+    .cliniq-workflow-description {
+        color:#64748B;
+        font-size:12px;
+        line-height:1.6;
+        margin-top:5px;
+    }
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background:white !important;
+        border:1px solid #E2EAF1 !important;
+        border-radius:17px !important;
+        box-shadow:0 5px 20px rgba(16,36,58,.055) !important;
+    }
+    .stTextInput input,.stTextArea textarea {
+        background:#F8FAFC !important;
+        border:1px solid #DCE5ED !important;
+        border-radius:10px !important;
+        font-size:14px !important;
+    }
+    .stTextInput input:focus,.stTextArea textarea:focus {
+        border-color:#0D9488 !important;
+        box-shadow:0 0 0 3px rgba(13,148,136,.12) !important;
+        background:white !important;
+    }
+    div[data-testid="stFormSubmitButton"] button {
+        background:linear-gradient(120deg,#0D9488,#0F766E) !important;
+        color:white !important;
+        border:0 !important;
+        border-radius:11px !important;
+        min-height:49px !important;
+        font-weight:800 !important;
+        box-shadow:0 5px 14px rgba(13,148,136,.2) !important;
+    }
+    div[data-testid="stFormSubmitButton"] button:hover {
+        transform:translateY(-2px);
+        box-shadow:0 8px 20px rgba(13,148,136,.25) !important;
+    }
+    
+/* CLINIQ RESPONSIVE PROFESSIONAL POLISH */
+
+html, body {
+    font-size: 16px;
+}
+
+[data-testid="stMarkdownContainer"] p {
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+[data-testid="stWidgetLabel"] p,
+[data-testid="stTextInput"] label,
+[data-testid="stTextArea"] label {
+    font-size: 0.88rem !important;
+    font-weight: 600 !important;
+}
+
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea {
+    font-size: 0.92rem !important;
+    border-radius: 9px !important;
+}
+
+@media (max-width: 900px) {
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        gap: 18px !important;
+    }
+
+    [data-testid="column"] {
+        width: 100% !important;
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 600px) {
+    [data-testid="stAppViewContainer"] .main .block-container {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    [data-testid="stMarkdownContainer"] p {
+        font-size: 0.88rem;
+    }
+}
+
+/* CLINIQ PERFECT ALIGNMENT */
+
+[data-testid="stAppViewBlockContainer"] {
+    max-width: 1500px !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 2rem !important;
+}
+
+[data-testid="stHorizontalBlock"] {
+    align-items: flex-start !important;
+    gap: 22px !important;
+}
+
+[data-testid="column"] {
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] {
+    box-sizing: border-box !important;
+    border-radius: 12px !important;
+    border-color: #D8E1EA !important;
+}
+
+[data-testid="stVerticalBlock"] {
+    gap: 14px !important;
+}
+
+[data-testid="stTextInput"],
+[data-testid="stTextArea"],
+[data-testid="stForm"] {
+    width: 100% !important;
+}
+
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+[data-testid="stFormSubmitButton"] button {
+    width: 100% !important;
+    min-height: 42px !important;
+    border-radius: 9px !important;
+    font-weight: 700 !important;
+}
+
+[data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3 {
+    line-height: 1.3 !important;
+    margin-top: 0.2rem !important;
+    margin-bottom: 0.45rem !important;
+}
+
+@media (max-width: 900px) {
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 16px !important;
+    }
+
+    [data-testid="column"] {
+        width: 100% !important;
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+}
+
+@media (max-width: 600px) {
+    [data-testid="stAppViewBlockContainer"] {
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
+    }
+}
+</style>
+    """)
+
+    # -----------------------------------------------------
+    # HERO
+    # -----------------------------------------------------
+
+    st.html("""
+    <div class="cliniq-hero">
+        <div class="cliniq-kicker">
+            CLINIQ / SMART CLINIC MANAGEMENT
+        </div>
+        <div class="cliniq-heading">
+            Student Visit Registration
+        </div>
+        <div class="cliniq-subtitle">
+            A professional registration workspace for recording
+            student visits and organising the clinic queue.
+        </div>
+        <div class="cliniq-pill">
+            ● REGISTRATION PORTAL ACTIVE
+        </div>
+    </div>
+    """)
+
+    # -----------------------------------------------------
+    # MAIN WORKSPACE
+    # -----------------------------------------------------
+
+    left, right = st.columns([1.65, 1], gap="large")
 
     with left:
 
-        st.subheader("Student Information")
+        with st.container(border=True):
 
-        st.write(
-            "Enter the student's details carefully."
-        )
+            st.html("""
+            <div class="cliniq-section">01 / STUDENT PROFILE</div>
+            <div class="cliniq-title">Student Information</div>
+            <div class="cliniq-description">
+                Enter the student's identifying information
+                carefully before recording the visit.
+            </div>
+            """)
 
-        with st.form("registration_form", clear_on_submit=True):
+            with st.form(
+                "registration_form",
+                clear_on_submit=True
+            ):
 
-            student_name = st.text_input(
-                "Student Full Name",
-                placeholder="Example: Rohith Parasuram"
-            )
+                student_name = st.text_input(
+                    "Student Full Name",
+                    placeholder="Enter student's full name"
+                )
 
-            student_id = st.text_input(
-                "Student ID",
-                placeholder="Enter college ID"
-            )
+                student_id = st.text_input(
+                    "Student ID",
+                    placeholder="Enter college registration ID"
+                )
 
-            st.markdown("---")
+                st.markdown("---")
 
-            st.subheader("Visit Information")
+                st.html("""
+                <div class="cliniq-section">
+                    02 / VISIT RECORD
+                </div>
+                <div class="cliniq-title">
+                    Visit Information
+                </div>
+                <div class="cliniq-description">
+                    Record the concern as stated by the student.
+                    Use clear, factual language.
+                </div>
+                """)
 
-            complaint = st.text_area(
-                "Reason for Clinic Visit",
-                placeholder=(
-                    "Enter the reason provided by the student..."
-                ),
-                height=150
-            )
+                complaint = st.text_area(
+                    "Reason for Clinic Visit",
+                    placeholder=(
+                        "Example: Student reports a headache "
+                        "since this morning..."
+                    ),
+                    height=180
+                )
 
-            st.caption(
-                "Describe the student's stated concern. "
-                "Do not enter an AI-generated diagnosis."
-            )
+                st.caption(
+                    "Record the student's stated concern only. "
+                    "Do not enter a diagnosis or treatment recommendation."
+                )
 
-            submitted = st.form_submit_button(
-                "➕ Register Student Visit",
-                width="stretch"
-            )
+                st.html("""
+                <div class="cliniq-info">
+                    <b>Privacy and data-entry reminder</b><br>
+                    Record only information needed for clinic
+                    registration and queue management. Keep
+                    student information confidential.
+                </div>
+                """)
 
+                submitted = st.form_submit_button(
+                    "✚  Register Student Visit",
+                    width="stretch",
+                    type="primary"
+                )
 
+                # -----------------------------------------
+                # VALIDATION AND BACKEND REGISTRATION
+                # -----------------------------------------
 
-            if submitted:
+                if submitted:
 
-                if not student_name.strip():
-                    st.error("Please enter the student's name.")
-
-                elif not student_id.strip():
-                    st.error("Please enter the student ID.")
-
-                elif not complaint.strip():
-                    st.error("Please enter the reason for the visit.")
-
-                else:
-                    try:
-                        visit_id = backend.register_visit(
-                            student_name.strip(),
-                            student_id.strip(),
-                            complaint.strip()
-                        )
-
-                        st.success(
-                            f"Student visit registered successfully! "
-                            f"Visit ID: {visit_id}"
-                        )
-
-                        st.rerun()
-
-                    except Exception as error:
+                    if not student_name.strip():
                         st.error(
-                            f"Unable to register student visit: {error}"
+                            "Please enter the student's full name."
                         )
 
+                    elif not student_id.strip():
+                        st.error(
+                            "Please enter the student ID."
+                        )
 
+                    elif not complaint.strip():
+                        st.error(
+                            "Please enter the reason for the visit."
+                        )
+
+                    else:
+                        try:
+                            visit_id = backend.register_visit(
+                                student_name=student_name.strip(),
+                                complaint=complaint.strip(),
+                                student_id=student_id.strip()
+                            )
+
+                            st.session_state[
+                                "registration_receipt"
+                            ] = {
+                                "visit_id": visit_id,
+                                "student_name": student_name.strip(),
+                                "student_id": student_id.strip(),
+                                "complaint": complaint.strip(),
+                                "registered_at": datetime.now().strftime(
+                                    "%d %b %Y, %I:%M %p"
+                                )
+                            }
+
+                            st.rerun()
+
+                        except Exception as error:
+                            st.error(
+                                f"Unable to register student visit: {error}"
+                            )
 
     # -----------------------------------------------------
-    # INFORMATION PANEL
+    # INFORMATION CENTRE
     # -----------------------------------------------------
 
     with right:
 
-        st.subheader("Registration Guide")
+        # REGISTRATION PROCESS
+        with st.container(border=True):
 
-        st.info(
-            "New student visits are added to the clinic system "
-            "for administrative queue management."
-        )
+            st.html("""
+            <div class="cliniq-section">REGISTRATION GUIDE</div>
+            <div class="cliniq-title">
+                Registration Process
+            </div>
+            <div class="cliniq-description">
+                Four simple steps to create a clinic visit record.
+            </div>
+            """)
 
-        st.markdown("**Registration steps**")
+            steps = [
+                ("01", "Student profile",
+                 "Enter the student's full name."),
+                ("02", "College identification",
+                 "Record the correct student ID."),
+                ("03", "Visit documentation",
+                 "Record the student's stated concern."),
+                ("04", "Registration",
+                 "Submit the form to create the visit.")
+            ]
 
-        st.write("1. Enter the student's full name.")
-        st.write("2. Enter the college student ID.")
-        st.write("3. Record the student's stated concern.")
-        st.write("4. Submit the registration form.")
+            for number, heading, description in steps:
 
-        st.markdown("---")
+                st.html(f"""
+                <div class="cliniq-step">
+                    <div class="cliniq-step-number">
+                        {number}
+                    </div>
+                    <div>
+                        <div class="cliniq-step-title">
+                            {heading}
+                        </div>
+                        <div class="cliniq-step-description">
+                            {description}
+                        </div>
+                    </div>
+                </div>
+                """)
 
-        st.subheader("Important Information")
+        # WHAT HAPPENS NEXT
+        with st.container(border=True):
 
-        st.warning(
-            "Clinical priority is not assigned during registration. "
-            "A nurse must review the visit and assign its priority."
-        )
+            st.html("""
+            <div class="cliniq-section">VISIT WORKFLOW</div>
+            <div class="cliniq-title">
+                What Happens Next?
+            </div>
+            <div class="cliniq-description">
+                The administrative registration process.
+            </div>
 
-        st.markdown("---")
+            <div class="cliniq-workflow">
+                <div class="cliniq-workflow-title">
+                    01 · Visit Registered
+                </div>
+                <div class="cliniq-workflow-description">
+                    Student information and stated concern
+                    are recorded in the clinic system.
+                </div>
+            </div>
 
-        st.markdown("**Available nurse priorities**")
+            <div class="cliniq-workflow">
+                <div class="cliniq-workflow-title">
+                    02 · Added to Queue
+                </div>
+                <div class="cliniq-workflow-description">
+                    The visit becomes available for
+                    administrative queue management.
+                </div>
+            </div>
 
-        st.write("🔴 See Now")
-        st.write("🟠 Today")
-        st.write("🟢 Routine")
+            <div class="cliniq-workflow">
+                <div class="cliniq-workflow-title">
+                    03 · Nurse Review
+                </div>
+                <div class="cliniq-workflow-description">
+                    A nurse reviews the visit and makes
+                    the clinical priority decision.
+                </div>
+            </div>
+            """)
 
-        st.caption(
-            "These priorities are assigned by the nurse only."
-        )
+        # SAFETY INFORMATION
+        with st.container(border=True):
+
+            st.html("""
+            <div class="cliniq-section">
+                CLINICAL SAFETY
+            </div>
+            <div class="cliniq-title">
+                Nurse Review Required
+            </div>
+            <div class="cliniq-warning">
+                <b>Important:</b><br>
+                Registration does not assign clinical priority.
+                A qualified nurse must review the visit and make
+                all clinical decisions. This system does not
+                diagnose, prescribe or replace professional
+                judgement.
+            </div>
+            """)
+
+        # NURSE PRIORITY GUIDE
+        with st.container(border=True):
+
+            st.html("""
+            <div class="cliniq-section">
+                PRIORITY REFERENCE
+            </div>
+            <div class="cliniq-title">
+                Nurse Priority Guide
+            </div>
+            <div class="cliniq-description">
+                These priority categories are assigned by
+                the nurse, not during registration.
+            </div>
+            """)
+
+            priorities = [
+                ("#EF4444", "See Now",
+                 "Requires immediate nurse review."),
+                ("#F97316", "Today",
+                 "Requires review during the day."),
+                ("#10B981", "Routine",
+                 "For routine nurse review.")
+            ]
+
+            for color, name, description in priorities:
+
+                st.html(f"""
+                <div class="cliniq-priority">
+                    <div class="cliniq-dot"
+                         style="background:{color};"></div>
+                    <div>
+                        <div class="cliniq-priority-name">
+                            {name}
+                        </div>
+                        <div class="cliniq-priority-description">
+                            {description}
+                        </div>
+                    </div>
+                </div>
+                """)
 
     # -----------------------------------------------------
-    # REGISTRATION RECEIPT
+    # DIGITAL REGISTRATION RECEIPT
     # -----------------------------------------------------
 
     receipt_data = st.session_state.get(
@@ -892,37 +2396,65 @@ elif page == "Register Visit":
 
         st.markdown("---")
 
-        st.subheader("✓ Registration Confirmation")
+        st.html("""
+        <div class="cliniq-section">
+            REGISTRATION COMPLETE
+        </div>
+        <div class="cliniq-title">
+            Visit Registration Confirmation
+        </div>
+        <div class="cliniq-description">
+            The administrative registration record is ready.
+        </div>
+        """)
 
-        receipt_col1, receipt_col2 = st.columns(2)
+        with st.container(border=True):
 
-        with receipt_col1:
+            st.success("Student visit registered successfully.")
 
-            st.write(
-                "**Student Name:**",
-                receipt_data["student_name"]
-            )
+            receipt_col1, receipt_col2 = st.columns(2)
 
-            st.write(
-                "**Student ID:**",
-                receipt_data["student_id"]
-            )
+            with receipt_col1:
 
-        with receipt_col2:
+                st.markdown("**STUDENT PROFILE**")
 
-            st.write(
-                "**Registered At:**",
-                receipt_data["registered_at"]
-            )
+                st.write(
+                    "**Student Name:**",
+                    receipt_data["student_name"]
+                )
 
-            st.write("**Initial Status:** Waiting for nurse review")
+                st.write(
+                    "**Student ID:**",
+                    receipt_data["student_id"]
+                )
 
-        st.write("**Visit Concern:**")
+            with receipt_col2:
 
-        st.write(receipt_data["complaint"])
+                st.markdown("**VISIT RECORD**")
 
-        receipt_text = f"""
+                st.write(
+                    "**Visit ID:**",
+                    receipt_data.get("visit_id", "Not available")
+                )
+
+                st.write(
+                    "**Registered At:**",
+                    receipt_data["registered_at"]
+                )
+
+                st.write(
+                    "**Initial Status:** Waiting for nurse review"
+                )
+
+            st.markdown("---")
+
+            st.markdown("**RECORDED VISIT CONCERN**")
+            st.write(receipt_data["complaint"])
+
+            receipt_text = f"""
 CLINIQ - STUDENT VISIT RECEIPT
+
+Visit ID: {receipt_data.get('visit_id', 'Not available')}
 
 Student Name: {receipt_data['student_name']}
 Student ID: {receipt_data['student_id']}
@@ -933,18 +2465,20 @@ Visit Concern:
 Registered At:
 {receipt_data['registered_at']}
 
-Note:
+Initial Status:
+Waiting for nurse review
+
 Clinical priority and care decisions are made by the nurse.
 This receipt is an administrative registration confirmation.
 """
 
-        st.download_button(
-            "⬇ Download Registration Receipt",
-            data=receipt_text,
-            file_name="CLINIQ_Visit_Receipt.txt",
-            mime="text/plain",
-            width="stretch"
-        )
+            st.download_button(
+                "⬇ Download Registration Receipt",
+                data=receipt_text,
+                file_name="CLINIQ_Visit_Receipt.txt",
+                mime="text/plain",
+                width="stretch"
+            )
 
 
 
@@ -954,10 +2488,103 @@ This receipt is an administrative registration confirmation.
 
 elif page == "Student Queue":
 
-    st.title("Student Visit Queue")
-    st.caption(
-        "Monitor registered visits and manage the clinic queue."
-    )
+    st.html("""
+    <style>
+    .queue-hero {
+        background: linear-gradient(120deg, #10243A 0%, #087F8C 100%);
+        padding: 28px 32px;
+        border-radius: 18px;
+        margin: 8px 0 24px 0;
+        color: white;
+        box-shadow: 0 8px 24px rgba(16,36,58,0.12);
+    }
+    .queue-hero h2 {
+        color: white;
+        font-size: 27px;
+        font-weight: 750;
+        margin: 0 0 8px 0;
+    }
+    .queue-hero p {
+        color: #E1F3F4;
+        font-size: 14px;
+        margin: 0;
+    }
+    div[data-testid="stExpander"] {
+        border: 1px solid #DFE8EF;
+        border-radius: 14px;
+        margin-bottom: 12px;
+        background: white;
+    }
+    div[data-testid="stExpander"] summary {
+        font-weight: 650;
+        color: #10243A;
+    }
+    div[data-testid="stSelectbox"],
+    div[data-testid="stTextInput"] {
+        padding-bottom: 6px;
+    }
+    div[data-testid="stForm"] {
+        background: #F7FAFC;
+        border: 1px solid #E5EDF3;
+        border-radius: 13px;
+        padding: 16px;
+    }
+    
+
+/* CLINIQ PREMIUM METRIC CARD DESIGN */
+
+.metric-card {
+    position: relative;
+    overflow: hidden;
+    min-height: 126px;
+    padding: 22px 23px;
+    background: linear-gradient(135deg, #FFFFFF 0%, #F0FAFA 100%);
+    border: 1px solid #D7E8E9;
+    border-left: 5px solid #0D9488;
+    border-radius: 15px;
+    box-shadow: 0 5px 16px rgba(16,36,58,0.07);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 25px rgba(13,148,136,0.13);
+}
+
+.metric-label {
+    color: #607789;
+    font-size: 12px;
+    font-weight: 750;
+    letter-spacing: 0.7px;
+    margin-bottom: 12px;
+}
+
+.metric-value {
+    color: #10243A;
+    font-size: 34px;
+    font-weight: 850;
+    line-height: 1.15;
+}
+
+@media (max-width: 768px) {
+    .metric-card {
+        min-height: 105px;
+        padding: 17px;
+    }
+
+    .metric-value {
+        font-size: 27px;
+    }
+}
+
+</style>
+    <div class="queue-hero">
+        <h2>Student Visit Queue</h2>
+        <p>Monitor registered visits, review nurse-assigned priorities and manage visit progress.</p>
+    </div>
+    """)
+
+    st.write("")
 
     # -----------------------------------------------------
     # QUEUE SUMMARY
@@ -975,13 +2602,13 @@ elif page == "Student Queue":
         metric_card("📋 Total Visits", len(visits))
 
     with q2:
-        metric_card("⏳ Waiting", waiting_count)
+        metric_card("Waiting", waiting_count)
 
     with q3:
         metric_card("🩺 In Consultation", consultation_count)
 
     with q4:
-        metric_card("✓ Completed", completed_count)
+        metric_card("\u2713 Completed", completed_count)
 
     st.markdown("---")
 
@@ -1145,12 +2772,14 @@ elif page == "Student Queue":
                             "Today",
                             "Routine"
                         ]
-
                         status_options = [
-                            "Waiting",
-                            "In Consultation",
-                            "Completed"
+                           "Waiting",
+                           "In Review",
+                           "Completed",
+                           "Cancelled"
                         ]
+                        
+                        
 
                         current_priority_index = (
                             priority_options.index(priority)
@@ -1181,15 +2810,16 @@ elif page == "Student Queue":
                             width="stretch"
                         )
 
+                    
                     if save_review:
 
                         try:
-                            backend.nurse_review(
+                            backend.update_nurse_review(
                                 visit_id,
                                 new_priority
                             )
 
-                            backend.update_status(
+                            backend.update_visit_status(
                                 visit_id,
                                 new_status
                             )
@@ -1238,15 +2868,68 @@ elif page == "Student Queue":
 
 elif page == "Visit Details":
 
-    st.title("Visit Details")
-    st.caption("View individual student visit information.")
+    st.html("""
+    <div style="
+        background:linear-gradient(120deg,#10243A 0%,#087F8C 100%);
+        padding:29px 32px;
+        border-radius:18px;
+        margin:8px 0 24px 0;
+        box-shadow:0 8px 24px rgba(16,36,58,0.13);
+    ">
+        <div style="
+            color:#9DE5DE;
+            font-size:12px;
+            font-weight:800;
+            letter-spacing:2px;
+            margin-bottom:10px;
+        ">CLINIQ / PATIENT RECORDS</div>
+        <div style="
+            color:white;
+            font-size:28px;
+            font-weight:800;
+            margin-bottom:8px;
+        ">Student Visit Details</div>
+        <div style="
+            color:#E1F3F4;
+            font-size:14px;
+            line-height:1.6;
+        ">Access individual visit records and review registered student information.</div>
+    </div>
+    """)
 
     if visits:
+
+        search_term = st.text_input(
+            "Search student or visit",
+            placeholder="Enter student name, student ID or visit ID...",
+            key="visit_details_search"
+        )
+
+        filtered_visits = [
+            v for v in visits
+            if search_term.strip().lower() in " ".join([
+                str(get_value(v, "id", "")),
+                str(get_value(v, "student_name", "")),
+                str(get_value(v, "student_id", ""))
+            ]).lower()
+        ]
+
+        filtered_visits = sorted(
+            filtered_visits,
+            key=lambda v: str(get_value(v, "created_at", "")),
+            reverse=True
+        )
+
+        if not filtered_visits:
+            st.warning("No matching student visits found.")
+            st.stop()
+
+        st.caption(f"{len(filtered_visits)} matching visit(s) found.")
 
         visit_options = {
             f"Visit #{get_value(v, 'id')} - "
             f"{get_value(v, 'student_name')}": get_value(v, "id")
-            for v in visits
+            for v in filtered_visits
         }
 
         selected_label = st.selectbox(
@@ -1278,10 +2961,28 @@ elif page == "Visit Details":
 
 elif page == "Appointment Management":
 
-    st.title("📅 Appointment Management")
-    st.caption(
-        "Schedule and manage student appointments at the clinic."
-    )
+    st.html("""
+    <div style="
+        background:linear-gradient(120deg,#10243A 0%,#087F8C 100%);
+        padding:29px 32px;
+        border-radius:18px;
+        margin:8px 0 24px 0;
+        box-shadow:0 8px 24px rgba(16,36,58,0.13);
+    ">
+        <div style="color:#9DE5DE;font-size:12px;font-weight:800;
+                    letter-spacing:2px;margin-bottom:10px;">
+            CLINIQ / SCHEDULING CENTRE
+        </div>
+        <div style="color:white;font-size:28px;font-weight:800;
+                    margin-bottom:8px;">
+            Appointment Management
+        </div>
+        <div style="color:#E1F3F4;font-size:14px;line-height:1.6;">
+            Book student appointments, monitor schedules and manage
+            appointment records in one place.
+        </div>
+    </div>
+    """)
 
     appointments = backend.get_all_appointments() or []
 
@@ -1327,7 +3028,7 @@ elif page == "Appointment Management":
     # -----------------------------------------------------
 
     booking_tab, records_tab = st.tabs([
-        "➕ Book Appointment",
+        "\u2795 Book Appointment",
         "📋 Appointment Records"
     ])
 
@@ -1337,7 +3038,23 @@ elif page == "Appointment Management":
 
     with booking_tab:
 
-        st.subheader("Book a New Appointment")
+        st.html("""
+        <div style="
+            background:#F0F7FA;
+            border:1px solid #DCE9EF;
+            border-left:5px solid #0D9488;
+            border-radius:12px;
+            padding:16px 20px;
+            margin:8px 0 20px 0;
+        ">
+            <div style="color:#10243A;font-size:19px;font-weight:750;">
+                New Appointment Booking
+            </div>
+            <div style="color:#64788A;font-size:13px;margin-top:5px;">
+                Enter the student's details and choose a suitable clinic date and time.
+            </div>
+        </div>
+        """)
 
         left, right = st.columns([1.5, 1], gap="large")
 
@@ -1388,13 +3105,14 @@ elif page == "Appointment Management":
 
                 else:
 
+                    
                     try:
                         appointment_id = backend.book_appointment(
-                            student_name.strip(),
-                            student_id.strip(),
-                            appointment_date.isoformat(),
-                            appointment_time.strftime("%H:%M"),
-                            purpose.strip()
+                            student_name=student_name.strip(),
+                            appointment_date=appointment_date.isoformat(),
+                            appointment_time=appointment_time.strftime("%H:%M"),
+                            student_id=student_id.strip(),
+                            purpose=purpose.strip()
                         )
 
                         st.success(
@@ -1438,7 +3156,23 @@ elif page == "Appointment Management":
 
     with records_tab:
 
-        st.subheader("Appointment Records")
+        st.html("""
+        <div style="
+            background:#F0F7FA;
+            border:1px solid #DCE9EF;
+            border-left:5px solid #0D9488;
+            border-radius:12px;
+            padding:16px 20px;
+            margin:8px 0 20px 0;
+        ">
+            <div style="color:#10243A;font-size:19px;font-weight:750;">
+                Appointment Records
+            </div>
+            <div style="color:#64788A;font-size:13px;margin-top:5px;">
+                Search bookings, filter by status, update records and export appointment reports.
+            </div>
+        </div>
+        """)
 
         if appointments:
 
@@ -1512,12 +3246,14 @@ elif page == "Appointment Management":
                     format_func=lambda x: appointment_options[x]
                 )
 
+                
                 new_status = st.selectbox(
                     "New Status",
                     [
-                        "Scheduled",
+                        "Booked",
                         "Completed",
-                        "Cancelled"
+                        "Cancelled",
+                        "Rescheduled"
                     ],
                     key="new_appointment_status"
                 )
@@ -1551,7 +3287,7 @@ elif page == "Appointment Management":
                 csv_data = appointment_df.to_csv(index=False)
 
                 st.download_button(
-                    "⬇ Download Appointment Report",
+                    "\u2B07 Download Appointment Report",
                     data=csv_data,
                     file_name="CLINIQ_Appointment_Report.csv",
                     mime="text/csv",
@@ -1578,10 +3314,28 @@ elif page == "Appointment Management":
 
 elif page == "Clinic Reports":
 
-    st.title("📊 Clinic Reports & Analytics")
-    st.caption(
-        "Administrative overview of student visits and clinic activity."
-    )
+    st.html("""
+    <div style="
+        background:linear-gradient(120deg,#10243A 0%,#087F8C 100%);
+        padding:29px 32px;
+        border-radius:18px;
+        margin:8px 0 24px 0;
+        box-shadow:0 8px 24px rgba(16,36,58,0.13);
+    ">
+        <div style="color:#9DE5DE;font-size:12px;font-weight:800;
+                    letter-spacing:2px;margin-bottom:10px;">
+            CLINIQ / INSIGHTS & PERFORMANCE
+        </div>
+        <div style="color:white;font-size:28px;font-weight:800;
+                    margin-bottom:8px;">
+            Clinic Reports & Analytics
+        </div>
+        <div style="color:#E1F3F4;font-size:14px;line-height:1.6;">
+            Explore clinic activity, review visit trends and generate
+            administrative insights using recorded visit data.
+        </div>
+    </div>
+    """)
 
     visits = backend.get_all_visits() or []
 
@@ -1623,7 +3377,23 @@ elif page == "Clinic Reports":
         # DATE FILTER
         # -------------------------------------------------
 
-        st.subheader("Report Date Range")
+        st.html("""
+        <div style="
+            background:#F0F7FA;
+            border:1px solid #DCE9EF;
+            border-left:5px solid #0D9488;
+            border-radius:12px;
+            padding:16px 20px;
+            margin:8px 0 18px 0;
+        ">
+            <div style="color:#10243A;font-size:19px;font-weight:750;">
+                Report Date Range
+            </div>
+            <div style="color:#64788A;font-size:13px;margin-top:5px;">
+                Select a reporting period to filter clinic visit analytics.
+            </div>
+        </div>
+        """)
 
         min_date = report_df["Date Only"].min()
         max_date = report_df["Date Only"].max()
@@ -1710,7 +3480,8 @@ elif page == "Clinic Reports":
         # STATUS ANALYSIS
         # -------------------------------------------------
 
-        st.subheader("Visit Status Analysis")
+        st.markdown("### Visit Status Analysis")
+        st.caption("Understand how student visits are distributed across clinic workflow statuses.")
 
         if "status" in filtered_df.columns:
 
@@ -1749,7 +3520,8 @@ elif page == "Clinic Reports":
         # NURSE PRIORITY ANALYSIS
         # -------------------------------------------------
 
-        st.subheader("Nurse Priority Analysis")
+        st.markdown("### Nurse Priority Analysis")
+        st.caption("Review priority categories recorded by nurses for administrative monitoring.")
 
         if "priority" in filtered_df.columns:
 
@@ -1798,7 +3570,8 @@ elif page == "Clinic Reports":
         # DAILY VISIT TREND
         # -------------------------------------------------
 
-        st.subheader("Daily Visit Trend")
+        st.markdown("### Daily Visit Trend")
+        st.caption("Track the number of registered student visits across the selected dates.")
 
         daily_data = (
             filtered_df.groupby("Date Only")
@@ -1819,7 +3592,23 @@ elif page == "Clinic Reports":
         # REPORT TABLE
         # -------------------------------------------------
 
-        st.subheader("Detailed Visit Records")
+        st.html("""
+        <div style="
+            background:#F0F7FA;
+            border:1px solid #DCE9EF;
+            border-left:5px solid #0D9488;
+            border-radius:12px;
+            padding:16px 20px;
+            margin:8px 0 18px 0;
+        ">
+            <div style="color:#10243A;font-size:19px;font-weight:750;">
+                Detailed Visit Records
+            </div>
+            <div style="color:#64788A;font-size:13px;margin-top:5px;">
+                Review registered visit information for the selected reporting period.
+            </div>
+        </div>
+        """)
 
         display_columns = [
             column for column in [
@@ -1854,7 +3643,7 @@ elif page == "Clinic Reports":
         csv_report = export_df.to_csv(index=False)
 
         st.download_button(
-            "⬇ Download Clinic Report (CSV)",
+            "\u2B07 Download Clinic Report (CSV)",
             data=csv_report,
             file_name="CLINIQ_Clinic_Report.csv",
             mime="text/csv",
@@ -1873,10 +3662,28 @@ elif page == "Clinic Reports":
 
 elif page == "Staff Management":
 
-    st.title("👥 Staff Management")
-    st.caption(
-        "Manage clinic staff accounts and access roles."
-    )
+    st.html("""
+    <div style="
+        background:linear-gradient(120deg,#10243A 0%,#087F8C 100%);
+        padding:29px 32px;
+        border-radius:18px;
+        margin:8px 0 24px 0;
+        box-shadow:0 8px 24px rgba(16,36,58,0.13);
+    ">
+        <div style="color:#9DE5DE;font-size:12px;font-weight:800;
+                    letter-spacing:2px;margin-bottom:10px;">
+            CLINIQ / ADMINISTRATION
+        </div>
+        <div style="color:white;font-size:28px;font-weight:800;
+                    margin-bottom:8px;">
+            Staff Management
+        </div>
+        <div style="color:#E1F3F4;font-size:14px;line-height:1.6;">
+            Manage clinic team accounts, assign access roles and
+            maintain the staff directory securely.
+        </div>
+    </div>
+    """)
 
     if role != "Admin":
 
@@ -1914,7 +3721,8 @@ elif page == "Staff Management":
     # STAFF SUMMARY
     # -----------------------------------------------------
 
-    st.subheader("Staff Overview")
+    st.markdown("### Staff Overview")
+    st.caption("A quick summary of registered clinic team members and their assigned roles.")
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -1937,7 +3745,7 @@ elif page == "Staff Management":
     # -----------------------------------------------------
 
     add_tab, records_tab = st.tabs([
-        "➕ Add Staff",
+        "\u2795 Add Staff",
         "📋 Staff Directory"
     ])
 
@@ -1947,7 +3755,23 @@ elif page == "Staff Management":
 
     with add_tab:
 
-        st.subheader("Create Staff Account")
+        st.html("""
+        <div style="
+            background:#F0F7FA;
+            border:1px solid #DCE9EF;
+            border-left:5px solid #0D9488;
+            border-radius:12px;
+            padding:16px 20px;
+            margin:8px 0 18px 0;
+        ">
+            <div style="color:#10243A;font-size:19px;font-weight:750;">
+                Create Staff Account
+            </div>
+            <div style="color:#64788A;font-size:13px;margin-top:5px;">
+                Register an authorised team member and assign their clinic access role.
+            </div>
+        </div>
+        """)
 
         st.info(
             "Create a unique username and assign an appropriate "
@@ -1978,7 +3802,7 @@ elif page == "Staff Management":
             )
 
             add_submitted = st.form_submit_button(
-                "➕ Create Staff Account",
+                "\u2795 Create Staff Account",
                 width="stretch"
             )
 
@@ -2022,7 +3846,23 @@ elif page == "Staff Management":
 
     with records_tab:
 
-        st.subheader("Registered Staff")
+        st.html("""
+        <div style="
+            background:#F0F7FA;
+            border:1px solid #DCE9EF;
+            border-left:5px solid #0D9488;
+            border-radius:12px;
+            padding:16px 20px;
+            margin:8px 0 18px 0;
+        ">
+            <div style="color:#10243A;font-size:19px;font-weight:750;">
+                Registered Staff Directory
+            </div>
+            <div style="color:#64788A;font-size:13px;margin-top:5px;">
+                Search clinic team members and review their registered account details and access roles.
+            </div>
+        </div>
+        """)
 
         if staff_records:
 
@@ -2200,12 +4040,397 @@ elif page == "Staff Management":
 # VISIT HISTORY
 # =========================================================
 
+
+
+# =========================================================
+# CSV UPLOAD & AI PROCESSING - ASSIGNMENT VERSION
+# =========================================================
+
+elif page == "CSV Upload & AI Processing":
+
+    from backend_v2.ai_service import classify_complaint
+    from backend_v2.csv_service import (
+        read_visits_csv,
+        process_visit_records,
+        export_nurse_queue_csv,
+        build_summary_report
+    )
+
+    st.html("""
+    <div style="
+        background: linear-gradient(120deg, #10243A 0%, #087F8C 100%);
+        padding: 30px 32px;
+        border-radius: 18px;
+        margin: 8px 0 24px 0;
+        box-shadow: 0 8px 24px rgba(16,36,58,0.13);
+    ">
+        <div style="
+            color: #9DE5DE;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        ">CLINIQ  /  INTELLIGENT CLINIC MANAGEMENT</div>
+        <div style="
+            color: white;
+            font-size: 29px;
+            font-weight: 800;
+            margin-bottom: 9px;
+        ">AI Visit Classification Centre</div>
+        <div style="
+            color: #E1F3F4;
+            font-size: 14px;
+            line-height: 1.6;
+        ">Upload student visit records, organise administrative priority
+        suggestions, and prepare structured reports for nurse review.</div>
+    </div>
+    """)
+
+    st.warning(
+        "SAFETY NOTICE: AI suggestions are not diagnoses or medical "
+        "advice. A qualified nurse must review every visit and make "
+        "the final priority decision. Potential emergency warning "
+        "signs require immediate human attention."
+    )
+
+    # -----------------------------------------------------
+    # 1. UPLOAD CSV
+    # -----------------------------------------------------
+
+    st.html("""
+    <div style="
+        background: #FFFFFF;
+        border: 1px solid #DFE8EF;
+        border-left: 5px solid #0D9488;
+        border-radius: 14px;
+        padding: 20px 23px;
+        margin: 8px 0 18px 0;
+    ">
+        <div style="font-size:19px;font-weight:750;color:#10243A;margin-bottom:8px;">
+            01 / Upload Student Visit Records
+        </div>
+        <div style="font-size:14px;color:#64748B;line-height:1.6;margin-bottom:15px;">
+            Import a CSV file containing student visit information.
+            Review the records before starting AI-assisted administrative classification.
+        </div>
+        <div style="font-size:13px;font-weight:700;color:#10243A;margin-bottom:9px;">
+            REQUIRED CSV COLUMNS
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:9px;">
+            <span style="background:#EAF2F8;padding:8px 13px;border-radius:8px;color:#10243A;font-size:13px;">
+                <b>id</b> ? Visit ID
+            </span>
+            <span style="background:#EAF2F8;padding:8px 13px;border-radius:8px;color:#10243A;font-size:13px;">
+                <b>time</b> ? Arrival time
+            </span>
+            <span style="background:#EAF2F8;padding:8px 13px;border-radius:8px;color:#10243A;font-size:13px;">
+                <b>note</b> ? Original complaint
+            </span>
+        </div>
+        <div style="font-size:12px;color:#718096;margin-top:13px;">
+            Supports English, Tamil and Tanglish notes. Use the sample CSV below as a template.
+        </div>
+    </div>
+    """)
+
+    st.subheader("Download a sample file")
+
+    sample_csv = """id,time,note
+V001,09:00,I have a high fever and headache
+V002,09:05,I twisted my ankle while playing football
+V003,09:10,Enakku stomach pain irukku
+V004,09:15,I have a severe headache
+V005,09:20,I got a small cut on my finger
+V006,09:25,I am feeling dizzy
+V007,09:30,Enakku cold and cough irukku
+V008,09:35,I have a skin rash and itching
+V009,09:40,I feel like vomiting
+V010,09:45,I have pain in my left knee
+V011,09:50,I am having difficulty breathing
+V012,09:55,Enakku kannu vali irukku
+V013,10:00,I have a toothache
+V014,10:05,I fainted in the classroom
+V015,10:10,I have a mild sore throat
+V016,10:15,My hand is swollen after an insect bite
+V017,10:20,Enakku romba tired ah irukku
+V018,10:25,I have back pain after carrying my bag
+V019,10:30,I have chest pain
+V020,10:35,I have a mild stomach ache after lunch
+"""
+
+    st.download_button(
+        "Download 20-visit sample CSV",
+        data=sample_csv.encode("utf-8-sig"),
+        file_name="visits.csv",
+        mime="text/csv",
+        width="stretch"
+    )
+
+    uploaded_csv = st.file_uploader(
+        "Choose visits.csv",
+        type=["csv"],
+        key="assignment_visits_upload"
+    )
+
+    if uploaded_csv is not None:
+
+        try:
+            uploaded_content = uploaded_csv.getvalue()
+
+            records = read_visits_csv(uploaded_content)
+
+            st.success(
+                f"Successfully loaded {len(records)} visit notes."
+            )
+
+            # -------------------------------------------------
+            # 2. INPUT PREVIEW
+            # -------------------------------------------------
+
+            st.subheader("2. Input Preview")
+
+            input_df = pd.DataFrame(records)
+
+            st.dataframe(
+                input_df,
+                width="stretch",
+                hide_index=True
+            )
+
+            st.info(
+                "Check the uploaded notes before starting AI processing."
+            )
+
+            # -------------------------------------------------
+            # 3. AI CLASSIFICATION
+            # -------------------------------------------------
+
+            st.subheader("3. AI Classification")
+
+            if st.button(
+                "Start AI Classification",
+                type="primary",
+                width="stretch",
+                key="assignment_run_ai"
+            ):
+
+                with st.spinner(
+                    "Processing all student visits. Please wait..."
+                ):
+
+                    results = process_visit_records(
+                        records,
+                        classify_complaint
+                    )
+
+                    st.session_state[
+                        "assignment_csv_results"
+                    ] = results
+
+                    st.session_state[
+                        "assignment_csv_content"
+                    ] = uploaded_content
+
+                st.success(
+                    "Classification completed. "
+                    "All results require nurse review."
+                )
+
+            # -------------------------------------------------
+            # DISPLAY RESULTS AND DOWNLOADS
+            # -------------------------------------------------
+
+            if (
+                "assignment_csv_results" in st.session_state
+                and st.session_state.get(
+                    "assignment_csv_content"
+                ) == uploaded_content
+            ):
+
+                results = st.session_state[
+                    "assignment_csv_results"
+                ]
+
+                st.html("""
+                <div style="
+                    background:#FFFFFF;
+                    border:1px solid #DFE8EF;
+                    border-left:5px solid #0D9488;
+                    border-radius:14px;
+                    padding:19px 22px;
+                    margin:22px 0 16px 0;
+                ">
+                    <div style="font-size:19px;font-weight:750;color:#10243A;">
+                        03 / AI Classification Results
+                    </div>
+                    <div style="font-size:13px;color:#718096;margin-top:6px;">
+                        Review the administrative classification suggestions for every uploaded visit.
+                    </div>
+                </div>
+                """)
+
+                results_df = pd.DataFrame(results)
+
+                st.dataframe(
+                    results_df[
+                        [
+                            "id",
+                            "time",
+                            "category",
+                            "priority",
+                            "summary"
+                        ]
+                    ],
+                    width="stretch",
+                    hide_index=True
+                )
+
+                # Priority counts
+                priority_counts = {
+                    "see_now": 0,
+                    "today": 0,
+                    "routine": 0
+                }
+
+                for item in results:
+                    priority = item["priority"]
+
+                    if priority in priority_counts:
+                        priority_counts[priority] += 1
+
+                st.markdown("#### Priority Distribution")
+
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.metric(
+                        label="See Now",
+                        value=priority_counts["see_now"],
+                        help="Highest administrative priority suggestion. Nurse review is required."
+                    )
+
+                with col2:
+                    st.metric(
+                        label="Today",
+                        value=priority_counts["today"],
+                        help="Administrative suggestion for review today."
+                    )
+
+                with col3:
+                    st.metric(
+                        label="Routine",
+                        value=priority_counts["routine"],
+                        help="Routine administrative review suggestion."
+                    )
+
+                st.info(
+                    "Priority order is an administrative suggestion. "
+                    "A nurse must independently review every visit."
+                )
+
+                # -------------------------------------------------
+                # 4. OUTPUT FILES
+                # -------------------------------------------------
+
+                st.html("""
+                <div style="
+                    background:#FFFFFF;
+                    border:1px solid #DFE8EF;
+                    border-left:5px solid #0D9488;
+                    border-radius:14px;
+                    padding:19px 22px;
+                    margin:22px 0 16px 0;
+                ">
+                    <div style="font-size:19px;font-weight:750;color:#10243A;">
+                        04 / Download Clinic Reports
+                    </div>
+                    <div style="font-size:13px;color:#718096;margin-top:6px;">
+                        Export the processed nurse queue and clinic summary.
+                    </div>
+                </div>
+                """)
+
+                st.markdown(
+                    """
+                    **Output 1 - nurse_queue.csv**
+
+                    Contains every visit, the original complaint,
+                    category, priority and summary.
+                    For nurse review only.
+
+                    **Output 2 - summary.txt**
+
+                    Contains counts by priority, category and
+                    arrival hour. It does not contain student notes.
+                    """
+                )
+
+                nurse_queue_data = export_nurse_queue_csv(results)
+
+                summary_data = build_summary_report(results)
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.download_button(
+                        label="Download nurse_queue.csv",
+                        data=nurse_queue_data.encode("utf-8-sig"),
+                        file_name="nurse_queue.csv",
+                        mime="text/csv",
+                        width="stretch",
+                        key="download_nurse_queue"
+                    )
+
+                with col2:
+                    st.download_button(
+                        label="Download summary.txt",
+                        data=summary_data.encode("utf-8"),
+                        file_name="summary.txt",
+                        mime="text/plain",
+                        width="stretch",
+                        key="download_clinic_summary"
+                    )
+
+                st.success(
+                    "Both assignment output files are ready for download."
+                )
+
+                st.caption(
+                    "CLINIQ Academic Project Prototype | "
+                    "All clinical decisions belong to qualified nurses."
+                )
+
+        except Exception as error:
+
+            st.error(
+                f"CSV processing error: {error}"
+            )
+
+
 elif page == "Visit History":
 
-    st.title("🗂️ Visit History")
-    st.caption(
-        "Search and review previously registered student visits."
-    )
+    st.html("""
+    <div style="
+        background:linear-gradient(120deg,#10243A 0%,#087F8C 100%);
+        padding:29px 32px;
+        border-radius:18px;
+        margin:8px 0 24px 0;
+        box-shadow:0 8px 24px rgba(16,36,58,0.13);
+    ">
+        <div style="color:#9DE5DE;font-size:12px;font-weight:800;
+                    letter-spacing:2px;margin-bottom:10px;">
+            CLINIQ / RECORDS ARCHIVE
+        </div>
+        <div style="color:white;font-size:28px;font-weight:800;
+                    margin-bottom:8px;">
+            Visit History
+        </div>
+        <div style="color:#E1F3F4;font-size:14px;line-height:1.6;">
+            Search previous student visits, review recorded statuses
+            and priorities, and export administrative records.
+        </div>
+    </div>
+    """)
 
     try:
         history_visits = backend.get_all_visits() or []
@@ -2225,7 +4450,23 @@ elif page == "Visit History":
         # SEARCH AND FILTERS
         # ---------------------------------------------
 
-        st.subheader("Search Visit Records")
+        st.html("""
+        <div style="
+            background:#F0F7FA;
+            border:1px solid #DCE9EF;
+            border-left:5px solid #0D9488;
+            border-radius:12px;
+            padding:16px 20px;
+            margin:8px 0 18px 0;
+        ">
+            <div style="color:#10243A;font-size:19px;font-weight:750;">
+                Search & Filter Visit Records
+            </div>
+            <div style="color:#64788A;font-size:13px;margin-top:5px;">
+                Find student records using a name, student ID, visit status or nurse-assigned priority.
+            </div>
+        </div>
+        """)
 
         search_col, status_col, priority_col = st.columns(3)
 
@@ -2412,7 +4653,7 @@ elif page == "Visit History":
             history_csv = export_history.to_csv(index=False)
 
             st.download_button(
-                "⬇ Download Visit History (CSV)",
+                "\u2B07 Download Visit History (CSV)",
                 data=history_csv,
                 file_name="CLINIQ_Visit_History.csv",
                 mime="text/csv",
@@ -2441,7 +4682,7 @@ footer_left, footer_right = st.columns(2)
 with footer_left:
     st.markdown(
         """
-        **✚ CLINIQ | Smart Clinic Management**
+        **\u2728 CLINIQ | Smart Clinic Management**
 
         <small>Student Clinic Visit Management System</small>
         """,
@@ -2475,3 +4716,4 @@ st.caption(
     "Administrative queue management only. "
     "Clinical decisions remain with qualified clinic staff."
 )
+
