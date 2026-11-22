@@ -1,0 +1,21 @@
+﻿id,time,note,category,priority,summary
+V002,09:03,I have chest pain,pain,see_now,Urgent warning sign requires immediate nurse review
+V007,09:18,I have difficulty breathing,pain,see_now,Urgent warning sign requires immediate nurse review
+V009,09:24,I feel dizzy and faint,pain,see_now,Urgent warning sign requires immediate nurse review
+V012,09:33,I have heavy bleeding from a cut,injury,see_now,Urgent warning sign requires immediate nurse review
+V015,09:42,I have swelling on my lips after eating,allergy,see_now,Urgent warning sign requires immediate nurse review
+V001,09:00,I twisted my ankle and it is swollen,injury,today,Local demonstration classification for nurse review
+V004,09:09,I have stomach pain since morning,stomach,today,Local demonstration classification for nurse review
+V006,09:15,I have fever and body pain,fever_cold,today,Local demonstration classification for nurse review
+V008,09:21,I have a small cut on my finger,injury,today,Local demonstration classification for nurse review
+V011,09:30,I have a skin rash,allergy,today,Local demonstration classification for nurse review
+V003,09:06,I have a mild headache,pain,routine,Local demonstration classification for nurse review
+V005,09:12,I need a medical certificate,other,routine,Local demonstration classification for nurse review
+V010,09:27,I have a mild cold and runny nose,fever_cold,routine,Local demonstration classification for nurse review
+V013,09:36,I have mild stomach discomfort,stomach,routine,Local demonstration classification for nurse review
+V014,09:39,I need a routine clinic appointment,other,routine,Local demonstration classification for nurse review
+V016,09:45,I have a sore throat,fever_cold,routine,Local demonstration classification for nurse review
+V017,09:48,I have severe pain and cannot stand,pain,routine,Local demonstration classification for nurse review
+V018,09:51,I need a general health check,other,routine,Local demonstration classification for nurse review
+V019,09:54,I have a mild cough,other,routine,Local demonstration classification for nurse review
+V020,09:57,I have a headache and feel tired,pain,routine,Local demonstration classification for nurse review
